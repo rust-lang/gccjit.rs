@@ -1,18 +1,18 @@
-use std::{ffi::CString, marker::PhantomData};
+use context::Context;
+use field;
+use field::Field;
+use gccjit_sys;
+use location;
+use location::Location;
+use object;
+use object::{Object, ToObject};
+use rvalue;
+use rvalue::{RValue, ToRValue};
 use std::fmt;
 use std::ptr;
-use gccjit_sys;
-use context::Context;
-use rvalue::{RValue, ToRValue};
-use rvalue;
-use object::{ToObject, Object};
-use object;
-use field::Field;
-use field;
-use location::Location;
-use location;
+use std::{ffi::CString, marker::PhantomData};
 
-#[cfg(feature="master")]
+#[cfg(feature = "master")]
 #[derive(Clone, Copy, Debug)]
 pub enum Visibility {
     Default,
@@ -21,7 +21,7 @@ pub enum Visibility {
     Protected,
 }
 
-#[cfg(feature="master")]
+#[cfg(feature = "master")]
 impl Visibility {
     pub fn as_str(&self) -> &'static str {
         match *self {
@@ -33,7 +33,7 @@ impl Visibility {
     }
 }
 
-#[cfg(feature="master")]
+#[cfg(feature = "master")]
 pub enum AttributeValue<'a> {
     #[allow(dead_code)]
     Int(i32),
@@ -41,13 +41,13 @@ pub enum AttributeValue<'a> {
     String(&'a str),
 }
 
-#[cfg(feature="master")]
+#[cfg(feature = "master")]
 #[derive(Clone, Copy, Debug)]
 pub enum VarAttribute {
     Visibility(Visibility),
 }
 
-#[cfg(feature="master")]
+#[cfg(feature = "master")]
 impl VarAttribute {
     fn get_value(&self) -> AttributeValue {
         match *self {
@@ -57,7 +57,9 @@ impl VarAttribute {
 
     fn to_sys(self) -> gccjit_sys::gcc_jit_variable_attribute {
         match self {
-            VarAttribute::Visibility(_) => gccjit_sys::gcc_jit_variable_attribute::GCC_JIT_VARIABLE_ATTRIBUTE_VISIBILITY,
+            VarAttribute::Visibility(_) => {
+                gccjit_sys::gcc_jit_variable_attribute::GCC_JIT_VARIABLE_ATTRIBUTE_VISIBILITY
+            }
         }
     }
 }
@@ -92,7 +94,7 @@ impl TlsModel {
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct LValue<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_lvalue
+    ptr: *mut gccjit_sys::gcc_jit_lvalue,
 }
 
 /// ToLValue is a trait implemented by types that can be converted (or treated
@@ -103,9 +105,7 @@ pub trait ToLValue<'ctx> {
 
 impl<'ctx> ToObject<'ctx> for LValue<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        unsafe {
-            object::from_ptr(gccjit_sys::gcc_jit_lvalue_as_object(self.ptr))
-        }
+        unsafe { object::from_ptr(gccjit_sys::gcc_jit_lvalue_as_object(self.ptr)) }
     }
 }
 
@@ -134,31 +134,26 @@ impl<'ctx> ToRValue<'ctx> for LValue<'ctx> {
 impl<'ctx> LValue<'ctx> {
     /// Given an LValue x and a Field f, gets an LValue for the field
     /// access x.f.
-    pub fn access_field(&self,
-                        loc: Option<Location<'ctx>>,
-                        field: Field<'ctx>) -> LValue<'ctx> {
+    pub fn access_field(&self, loc: Option<Location<'ctx>>, field: Field<'ctx>) -> LValue<'ctx> {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
-            None => ptr::null_mut()
+            None => ptr::null_mut(),
         };
         unsafe {
-            let ptr = gccjit_sys::gcc_jit_lvalue_access_field(self.ptr,
-                                                              loc_ptr,
-                                                              field::get_ptr(&field));
+            let ptr =
+                gccjit_sys::gcc_jit_lvalue_access_field(self.ptr, loc_ptr, field::get_ptr(&field));
             from_ptr(ptr)
         }
     }
 
     /// Given an LValue x, returns the RValue address of x, akin to C's &x.
-    pub fn get_address(&self,
-                       loc: Option<Location<'ctx>>) -> RValue<'ctx> {
+    pub fn get_address(&self, loc: Option<Location<'ctx>>) -> RValue<'ctx> {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
-            None => ptr::null_mut()
+            None => ptr::null_mut(),
         };
         unsafe {
-            let ptr = gccjit_sys::gcc_jit_lvalue_get_address(self.ptr,
-                                                             loc_ptr);
+            let ptr = gccjit_sys::gcc_jit_lvalue_get_address(self.ptr, loc_ptr);
             rvalue::from_ptr(ptr)
         }
     }
@@ -166,14 +161,21 @@ impl<'ctx> LValue<'ctx> {
     /// Set the initialization value for a global variable.
     pub fn global_set_initializer(&self, blob: &[u8]) {
         unsafe {
-            gccjit_sys::gcc_jit_global_set_initializer(self.ptr, blob.as_ptr() as _, blob.len() as _);
+            gccjit_sys::gcc_jit_global_set_initializer(
+                self.ptr,
+                blob.as_ptr() as _,
+                blob.len() as _,
+            );
         }
     }
 
     /// Set the initialization value for a global variable.
     pub fn global_set_initializer_rvalue(&self, value: RValue<'ctx>) -> LValue<'ctx> {
         unsafe {
-            from_ptr(gccjit_sys::gcc_jit_global_set_initializer_rvalue(self.ptr, rvalue::get_ptr(&value)))
+            from_ptr(gccjit_sys::gcc_jit_global_set_initializer_rvalue(
+                self.ptr,
+                rvalue::get_ptr(&value),
+            ))
         }
     }
 
@@ -190,7 +192,7 @@ impl<'ctx> LValue<'ctx> {
         }
     }
 
-    #[cfg(feature="master")]
+    #[cfg(feature = "master")]
     pub fn global_set_readonly(&self) {
         unsafe {
             gccjit_sys::gcc_jit_global_set_readonly(self.ptr);
@@ -211,12 +213,10 @@ impl<'ctx> LValue<'ctx> {
     }
 
     pub fn get_alignment(&self) -> i32 {
-        unsafe {
-            gccjit_sys::gcc_jit_lvalue_get_alignment(self.ptr)
-        }
+        unsafe { gccjit_sys::gcc_jit_lvalue_get_alignment(self.ptr) }
     }
 
-    #[cfg(feature="master")]
+    #[cfg(feature = "master")]
     pub fn add_attribute(&self, attribute: VarAttribute) {
         let value = attribute.get_value();
         match value {
@@ -225,9 +225,13 @@ impl<'ctx> LValue<'ctx> {
             AttributeValue::String(string) => {
                 let cstr = CString::new(string).unwrap();
                 unsafe {
-                    gccjit_sys::gcc_jit_lvalue_add_attribute(self.ptr, attribute.to_sys(), cstr.as_ptr());
+                    gccjit_sys::gcc_jit_lvalue_add_attribute(
+                        self.ptr,
+                        attribute.to_sys(),
+                        cstr.as_ptr(),
+                    );
                 }
-            },
+            }
         }
     }
 }
@@ -235,7 +239,7 @@ impl<'ctx> LValue<'ctx> {
 pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_lvalue) -> LValue<'ctx> {
     LValue {
         marker: PhantomData,
-        ptr
+        ptr,
     }
 }
 

@@ -1,27 +1,25 @@
-use std::marker::PhantomData;
-use std::fmt;
-use gccjit_sys;
 use context::Context;
-use object::{ToObject, Object};
-use object;
-use rvalue::{RValue, ToRValue};
-use rvalue;
-use lvalue::{LValue, ToLValue};
+use gccjit_sys;
 use lvalue;
+use lvalue::{LValue, ToLValue};
+use object;
+use object::{Object, ToObject};
+use rvalue;
+use rvalue::{RValue, ToRValue};
+use std::fmt;
+use std::marker::PhantomData;
 
 /// Parameter represents a parameter to a function. A series of parameteres
 /// can be combined to form a function signature.
 #[derive(Copy, Clone, PartialEq)]
 pub struct Parameter<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_param
+    ptr: *mut gccjit_sys::gcc_jit_param,
 }
 
 impl<'ctx> ToObject<'ctx> for Parameter<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        unsafe {
-            object::from_ptr(gccjit_sys::gcc_jit_param_as_object(self.ptr))
-        }
+        unsafe { object::from_ptr(gccjit_sys::gcc_jit_param_as_object(self.ptr)) }
     }
 }
 
@@ -50,15 +48,13 @@ impl<'ctx> ToLValue<'ctx> for Parameter<'ctx> {
     }
 }
 
-
 pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_param) -> Parameter<'ctx> {
     Parameter {
         marker: PhantomData,
-        ptr
+        ptr,
     }
 }
 
 pub unsafe fn get_ptr<'ctx>(loc: &Parameter<'ctx>) -> *mut gccjit_sys::gcc_jit_param {
     loc.ptr
 }
-

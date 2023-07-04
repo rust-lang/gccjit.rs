@@ -1,24 +1,24 @@
 use gccjit_sys;
 
-use std::marker::PhantomData;
 use std::fmt;
+use std::marker::PhantomData;
 use std::ptr;
 
 use context::Context;
-use field::Field;
 use field;
-use types::Type;
-use types;
-use location::Location;
+use field::Field;
 use location;
-use object::{ToObject, Object};
+use location::Location;
+use object::{Object, ToObject};
+use types;
+use types::Type;
 
 /// A Struct is gccjit's representation of a composite type. Despite the name,
 /// Struct can represent either a struct, an union, or an opaque named type.
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct Struct<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_struct
+    ptr: *mut gccjit_sys::gcc_jit_struct,
 }
 
 impl<'ctx> Struct<'ctx> {
@@ -29,22 +29,23 @@ impl<'ctx> Struct<'ctx> {
         }
     }
 
-    pub fn set_fields(&self,
-                      location: Option<Location<'ctx>>,
-                      fields: &[Field<'ctx>]) {
+    pub fn set_fields(&self, location: Option<Location<'ctx>>, fields: &[Field<'ctx>]) {
         let loc_ptr = match location {
-                Some(loc) => unsafe { location::get_ptr(&loc) },
-                None => ptr::null_mut()
+            Some(loc) => unsafe { location::get_ptr(&loc) },
+            None => ptr::null_mut(),
         };
         let num_fields = fields.len() as i32;
-        let mut fields_ptrs : Vec<_> = fields.iter()
+        let mut fields_ptrs: Vec<_> = fields
+            .iter()
             .map(|x| unsafe { field::get_ptr(x) })
             .collect();
         unsafe {
-            gccjit_sys::gcc_jit_struct_set_fields(self.ptr,
-                                                  loc_ptr,
-                                                  num_fields,
-                                                  fields_ptrs.as_mut_ptr());
+            gccjit_sys::gcc_jit_struct_set_fields(
+                self.ptr,
+                loc_ptr,
+                num_fields,
+                fields_ptrs.as_mut_ptr(),
+            );
         }
         #[cfg(debug_assertions)]
         if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
@@ -97,6 +98,6 @@ impl<'ctx> fmt::Debug for Struct<'ctx> {
 pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_struct) -> Struct<'ctx> {
     Struct {
         marker: PhantomData,
-        ptr
+        ptr,
     }
 }

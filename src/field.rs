@@ -1,25 +1,23 @@
 use gccjit_sys;
 
-use std::marker::PhantomData;
 use std::fmt;
+use std::marker::PhantomData;
 
 use context::Context;
-use object::{ToObject, Object};
 use object;
+use object::{Object, ToObject};
 
 /// Field represents a field that composes structs or unions. A number of fields
 /// can be combined to create either a struct or a union.
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct Field<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_field
+    ptr: *mut gccjit_sys::gcc_jit_field,
 }
 
 impl<'ctx> ToObject<'ctx> for Field<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        unsafe {
-            object::from_ptr(gccjit_sys::gcc_jit_field_as_object(self.ptr))
-        }
+        unsafe { object::from_ptr(gccjit_sys::gcc_jit_field_as_object(self.ptr)) }
     }
 }
 
@@ -33,7 +31,7 @@ impl<'ctx> fmt::Debug for Field<'ctx> {
 pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_field) -> Field<'ctx> {
     Field {
         marker: PhantomData,
-        ptr
+        ptr,
     }
 }
 

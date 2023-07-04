@@ -1,10 +1,10 @@
-use std::marker::PhantomData;
 use std::fmt;
+use std::marker::PhantomData;
 
 use gccjit_sys;
 
-use context::Context;
 use context;
+use context::Context;
 use object;
 use object::{Object, ToObject};
 use structs::{self, Struct};
@@ -17,40 +17,36 @@ use gccjit_sys::gcc_jit_types::*;
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct Type<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_type
+    ptr: *mut gccjit_sys::gcc_jit_type,
 }
 
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct VectorType<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_vector_type
+    ptr: *mut gccjit_sys::gcc_jit_vector_type,
 }
 
 impl<'ctx> VectorType<'ctx> {
     unsafe fn from_ptr(ptr: *mut gccjit_sys::gcc_jit_vector_type) -> VectorType<'ctx> {
         VectorType {
             marker: PhantomData,
-            ptr
+            ptr,
         }
     }
 
     pub fn get_element_type(&self) -> Type<'ctx> {
-        unsafe {
-            from_ptr(gccjit_sys::gcc_jit_vector_type_get_element_type(self.ptr))
-        }
+        unsafe { from_ptr(gccjit_sys::gcc_jit_vector_type_get_element_type(self.ptr)) }
     }
 
     pub fn get_num_units(&self) -> usize {
-        unsafe {
-            gccjit_sys::gcc_jit_vector_type_get_num_units(self.ptr) as usize
-        }
+        unsafe { gccjit_sys::gcc_jit_vector_type_get_num_units(self.ptr) as usize }
     }
 }
 
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct FunctionPtrType<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_function_type
+    ptr: *mut gccjit_sys::gcc_jit_function_type,
 }
 
 impl<'ctx> fmt::Debug for FunctionPtrType<'ctx> {
@@ -67,26 +63,24 @@ impl<'ctx> FunctionPtrType<'ctx> {
     unsafe fn from_ptr(ptr: *mut gccjit_sys::gcc_jit_function_type) -> FunctionPtrType<'ctx> {
         FunctionPtrType {
             marker: PhantomData,
-            ptr
+            ptr,
         }
     }
 
     pub fn get_return_type(&self) -> Type<'ctx> {
-        unsafe {
-            from_ptr(gccjit_sys::gcc_jit_function_type_get_return_type(self.ptr))
-        }
+        unsafe { from_ptr(gccjit_sys::gcc_jit_function_type_get_return_type(self.ptr)) }
     }
 
     pub fn get_param_count(&self) -> usize {
-        unsafe {
-            gccjit_sys::gcc_jit_function_type_get_param_count(self.ptr) as usize
-        }
+        unsafe { gccjit_sys::gcc_jit_function_type_get_param_count(self.ptr) as usize }
     }
 
     pub fn get_param_type(&self, index: usize) -> Type<'ctx> {
         // TODO: return Option?
         unsafe {
-            from_ptr(gccjit_sys::gcc_jit_function_type_get_param_type(self.ptr, index as _))
+            from_ptr(gccjit_sys::gcc_jit_function_type_get_param_type(
+                self.ptr, index as _,
+            ))
         }
     }
 }
@@ -110,12 +104,10 @@ impl<'ctx> fmt::Debug for Type<'ctx> {
 impl<'ctx> Type<'ctx> {
     /// Given a type T, creates a type to *T, a pointer to T.
     pub fn make_pointer(self) -> Type<'ctx> {
-        unsafe {
-            from_ptr(gccjit_sys::gcc_jit_type_get_pointer(self.ptr))
-        }
+        unsafe { from_ptr(gccjit_sys::gcc_jit_type_get_pointer(self.ptr)) }
     }
 
-    #[cfg(feature="master")]
+    #[cfg(feature = "master")]
     pub fn set_packed(&self) {
         unsafe {
             gccjit_sys::gcc_jit_type_set_packed(self.ptr);
@@ -124,22 +116,21 @@ impl<'ctx> Type<'ctx> {
 
     /// Given a type T, creates a type of const T.
     pub fn make_const(self) -> Type<'ctx> {
-        unsafe {
-            from_ptr(gccjit_sys::gcc_jit_type_get_const(self.ptr))
-        }
+        unsafe { from_ptr(gccjit_sys::gcc_jit_type_get_const(self.ptr)) }
     }
 
     /// Given a type T, creates a new type of volatile T, which
     /// has the semantics of C's volatile.
     pub fn make_volatile(self) -> Type<'ctx> {
-        unsafe {
-            from_ptr(gccjit_sys::gcc_jit_type_get_volatile(self.ptr))
-        }
+        unsafe { from_ptr(gccjit_sys::gcc_jit_type_get_volatile(self.ptr)) }
     }
 
     pub fn get_aligned(self, alignment_in_bytes: u64) -> Type<'ctx> {
         unsafe {
-            from_ptr(gccjit_sys::gcc_jit_type_get_aligned(self.ptr, alignment_in_bytes as _))
+            from_ptr(gccjit_sys::gcc_jit_type_get_aligned(
+                self.ptr,
+                alignment_in_bytes as _,
+            ))
         }
     }
 
@@ -154,15 +145,11 @@ impl<'ctx> Type<'ctx> {
     }
 
     pub fn is_bool(self) -> bool {
-        unsafe {
-            gccjit_sys::gcc_jit_type_is_bool(self.ptr) != 0
-        }
+        unsafe { gccjit_sys::gcc_jit_type_is_bool(self.ptr) != 0 }
     }
 
     pub fn is_integral(self) -> bool {
-        unsafe {
-            gccjit_sys::gcc_jit_type_is_integral(self.ptr) != 0
-        }
+        unsafe { gccjit_sys::gcc_jit_type_is_integral(self.ptr) != 0 }
     }
 
     pub fn dyncast_vector(self) -> Option<VectorType<'ctx>> {
@@ -204,9 +191,7 @@ impl<'ctx> Type<'ctx> {
     }
 
     pub fn unqualified(&self) -> Type<'ctx> {
-        unsafe {
-            from_ptr(gccjit_sys::gcc_jit_type_unqualified(self.ptr))
-        }
+        unsafe { from_ptr(gccjit_sys::gcc_jit_type_unqualified(self.ptr)) }
     }
 
     pub fn get_pointee(&self) -> Option<Type<'ctx>> {
@@ -219,7 +204,7 @@ impl<'ctx> Type<'ctx> {
         }
     }
 
-    #[cfg(feature="master")]
+    #[cfg(feature = "master")]
     pub fn is_const(&self) -> Option<Type<'ctx>> {
         unsafe {
             let value = gccjit_sys::gcc_jit_type_is_const(self.ptr);
@@ -231,9 +216,7 @@ impl<'ctx> Type<'ctx> {
     }
 
     pub fn is_compatible_with(&self, typ: Type<'ctx>) -> bool {
-        unsafe {
-            gccjit_sys::gcc_jit_compatible_types(self.ptr, typ.ptr)
-        }
+        unsafe { gccjit_sys::gcc_jit_compatible_types(self.ptr, typ.ptr) }
     }
 }
 
@@ -260,7 +243,7 @@ macro_rules! typeable_def {
                 }
             }
         }
-    }
+    };
 }
 
 typeable_def!((), GCC_JIT_TYPE_VOID);
@@ -276,12 +259,16 @@ macro_rules! typeable_int_def {
             fn get_type<'a, 'ctx>(ctx: &'a Context<'ctx>) -> Type<'a> {
                 unsafe {
                     let ctx_ptr = context::get_ptr(ctx);
-                    let ptr = gccjit_sys::gcc_jit_context_get_int_type(ctx_ptr, $num_bytes, $signed as i32);
+                    let ptr = gccjit_sys::gcc_jit_context_get_int_type(
+                        ctx_ptr,
+                        $num_bytes,
+                        $signed as i32,
+                    );
                     from_ptr(ptr)
                 }
             }
         }
-    }
+    };
 }
 
 typeable_int_def!(i8, 1, true);
@@ -331,7 +318,7 @@ impl<T> Typeable for *const T {
 pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_type) -> Type<'ctx> {
     Type {
         marker: PhantomData,
-        ptr
+        ptr,
     }
 }
 

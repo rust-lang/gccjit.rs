@@ -1,8 +1,8 @@
-use gccjit_sys;
 use context::Context;
-use std::marker::PhantomData;
-use std::fmt;
+use gccjit_sys;
 use std::ffi::CStr;
+use std::fmt;
+use std::marker::PhantomData;
 use std::str;
 
 use crate::context;
@@ -13,7 +13,7 @@ use crate::context;
 #[derive(Copy, Clone)]
 pub struct Object<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_object
+    ptr: *mut gccjit_sys::gcc_jit_object,
 }
 
 impl<'ctx> fmt::Debug for Object<'ctx> {
@@ -47,7 +47,9 @@ impl<'ctx> Object<'ctx> {
     pub fn get_context(&self) -> ContextRef<'ctx> {
         unsafe {
             ContextRef {
-                context: ManuallyDrop::new(context::from_ptr(gccjit_sys::gcc_jit_object_get_context(self.ptr))),
+                context: ManuallyDrop::new(context::from_ptr(
+                    gccjit_sys::gcc_jit_object_get_context(self.ptr),
+                )),
             }
         }
     }
@@ -67,12 +69,10 @@ impl<'ctx> ToObject<'ctx> for Object<'ctx> {
 pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_object) -> Object<'ctx> {
     Object {
         marker: PhantomData,
-        ptr
+        ptr,
     }
 }
 
 pub unsafe fn get_ptr<'ctx>(object: &Object<'ctx>) -> *mut gccjit_sys::gcc_jit_object {
     object.ptr
 }
-
-

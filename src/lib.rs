@@ -19,45 +19,48 @@
 extern crate gccjit_sys;
 
 mod asm;
-mod types;
-mod context;
-mod object;
-mod location;
-mod field;
-mod structs;
-mod lvalue;
-mod rvalue;
-mod parameter;
-mod function;
 mod block;
+mod context;
+mod field;
+mod function;
+mod location;
+mod lvalue;
+mod object;
+mod parameter;
+mod rvalue;
+mod structs;
+mod types;
 
-pub use context::Context;
+pub use block::{BinaryOp, Block, ComparisonOp, UnaryOp};
 pub use context::CType;
+pub use context::CompileResult;
+pub use context::Context;
 pub use context::GlobalKind;
 pub use context::OptimizationLevel;
-pub use context::CompileResult;
 pub use context::OutputKind;
+pub use field::Field;
+#[cfg(feature = "master")]
+pub use function::FnAttribute;
+pub use function::{Function, FunctionType};
 pub use location::Location;
+pub use lvalue::{LValue, TlsModel, ToLValue};
+#[cfg(feature = "master")]
+pub use lvalue::{VarAttribute, Visibility};
 pub use object::Object;
 pub use object::ToObject;
+pub use parameter::Parameter;
+pub use rvalue::{RValue, ToRValue};
+pub use structs::Struct;
 pub use types::FunctionPtrType;
 pub use types::Type;
 pub use types::Typeable;
-pub use field::Field;
-pub use structs::Struct;
-#[cfg(feature="master")]
-pub use lvalue::{VarAttribute, Visibility};
-pub use lvalue::{LValue, TlsModel, ToLValue};
-pub use rvalue::{RValue, ToRValue};
-pub use parameter::Parameter;
-#[cfg(feature="master")]
-pub use function::FnAttribute;
-pub use function::{Function, FunctionType};
-pub use block::{Block, BinaryOp, UnaryOp, ComparisonOp};
 
-#[cfg(feature="master")]
+#[cfg(feature = "master")]
 pub fn set_global_personality_function_name(name: &'static [u8]) {
-    debug_assert!(name.ends_with(&[b'\0']), "Expecting a NUL-terminated C string");
+    debug_assert!(
+        name.ends_with(&[b'\0']),
+        "Expecting a NUL-terminated C string"
+    );
     unsafe {
         gccjit_sys::gcc_jit_set_global_personality_function_name(name.as_ptr() as *const _);
     }
