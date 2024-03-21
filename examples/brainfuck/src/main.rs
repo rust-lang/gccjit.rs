@@ -178,7 +178,6 @@ fn codegen<'a, 'ctx>(ops: &[Op], context: &'a gccjit::Context<'ctx>) -> bool {
             },
             Op::Output => {
                 let access = context.new_array_access(None, array.to_rvalue(), memory_ptr.to_rvalue());
-               
                 let call = context.new_call(None, putchar, &[access.to_rvalue()]);
                 current_block.add_eval(None, call);
             }
