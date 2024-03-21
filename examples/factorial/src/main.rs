@@ -35,7 +35,7 @@ fn main() {
     true_branch.end_with_return(None, context.new_rvalue_one(int_ty));
     // recurse_block: return n * fact(n-1)
     let n_minus_one = parm - context.new_rvalue_one(int_ty);
-    // a call to context.new_call will give us warning
+    
     let call = context.new_call(None, factorial, &[n_minus_one]);
     let mul = parm * call;
     false_branch.end_with_return(None, mul);
