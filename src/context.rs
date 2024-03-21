@@ -690,6 +690,7 @@ impl<'ctx> Context<'ctx> {
     /// together with LValues and Parameters, for example), so in order to
     /// mix the types of the arguments it may be necessary to call to_rvalue()
     /// before calling this function.
+    #[must_use]
     pub fn new_call<'a>(&'a self,
                         loc: Option<Location<'a>>,
                         func: Function<'a>,
