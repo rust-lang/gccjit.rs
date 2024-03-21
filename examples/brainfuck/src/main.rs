@@ -173,7 +173,6 @@ fn codegen<'a, 'ctx>(ops: &[Op], context: &'a gccjit::Context<'ctx>) -> bool {
             }
             Op::Input => {
                 let access = context.new_array_access(None, array.to_rvalue(), memory_ptr.to_rvalue());
-               
                 let chr = context.new_call(None, getchar, &[]);
                 current_block.add_assignment(None, access, chr);
             },
