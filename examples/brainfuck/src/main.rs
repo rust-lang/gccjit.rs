@@ -107,6 +107,7 @@ fn codegen<'a, 'ctx>(ops: &[Op], context: &'a gccjit::Context<'ctx>) -> bool {
     let mut current_block = brainf_main.new_block("entry_block");
     // now we have to zero out the giant buffer we just allocated on the stack.
     let zero_access = context.new_array_access(None, array.to_rvalue(), context.new_rvalue_zero(int_ty));
+    // a call to context.new_call will give us warning
     current_block.add_eval(None, context.new_call(None, memset, &[zero_access.get_address(None), context.new_rvalue_zero(int_ty), size]));
     let mut block_stack = vec![];
     let mut blocks = 0;
@@ -172,11 +173,13 @@ fn codegen<'a, 'ctx>(ops: &[Op], context: &'a gccjit::Context<'ctx>) -> bool {
             }
             Op::Input => {
                 let access = context.new_array_access(None, array.to_rvalue(), memory_ptr.to_rvalue());
+                // a call to context.new_call will give us warning
                 let chr = context.new_call(None, getchar, &[]);
                 current_block.add_assignment(None, access, chr);
             },
             Op::Output => {
                 let access = context.new_array_access(None, array.to_rvalue(), memory_ptr.to_rvalue());
+                // a call to context.new_call will give us warning
                 let call = context.new_call(None, putchar, &[access.to_rvalue()]);
                 current_block.add_eval(None, call);
             }
