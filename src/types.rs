@@ -160,6 +160,10 @@ impl<'ctx> Type<'ctx> {
         }
     }
 
+    pub fn is_undefined(self) -> bool {
+        self.ptr.is_null()
+    }
+
     pub fn is_bool(self) -> bool {
         unsafe {
             gccjit_sys::gcc_jit_type_is_bool(self.ptr) != 0
