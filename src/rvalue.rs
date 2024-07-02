@@ -110,6 +110,15 @@ impl<'ctx> RValue<'ctx> {
         }
     }
 
+    /// Change the type of this RValue.
+    #[cfg(feature="master")]
+    pub fn set_type(&self, typ: Type<'ctx>) {
+        unsafe {
+            let type_ptr = types::get_ptr(&typ);
+            gccjit_sys::gcc_jit_rvalue_set_type(self.ptr, type_ptr);
+        }
+    }
+
     /// Given an RValue x and a Field f, returns an RValue representing
     /// C's x.f.
     pub fn access_field(&self,

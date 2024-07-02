@@ -685,4 +685,7 @@ extern {
 
     #[cfg(feature="master")]
     pub fn gcc_jit_lvalue_remove(lvalue: *mut gcc_jit_lvalue);
+
+    #[cfg(feature="master")]
+    pub fn gcc_jit_rvalue_set_type(rvalue: *mut gcc_jit_rvalue, new_type: *mut gcc_jit_type);
 }
