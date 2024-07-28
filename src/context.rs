@@ -1,4 +1,4 @@
-use std::ffi::{CStr, CString};
+use std::ffi::{c_void, CStr, CString};
 use std::marker::PhantomData;
 use std::mem;
 use std::os::raw::{c_int, c_ulong};
@@ -279,8 +279,8 @@ impl<'ctx> Context<'ctx> {
             let file_ref = file.as_ref();
             let cstr = CString::new(file_ref).unwrap();
             gccjit_sys::gcc_jit_context_compile_to_file(self.ptr,
-                                                        mem::transmute(kind),
-                                                        cstr.as_ptr());
+                mem::transmute::<OutputKind, gccjit_sys::gcc_jit_output_kind>(kind),
+                cstr.as_ptr());
         }
     }
 
@@ -352,7 +352,7 @@ impl<'ctx> Context<'ctx> {
             let ptr = gccjit_sys::gcc_jit_context_new_global(
                 self.ptr,
                 loc_ptr,
-                mem::transmute(kind),
+                mem::transmute::<GlobalKind, gccjit_sys::gcc_jit_global_kind>(kind),
                 types::get_ptr(&ty),
                 cstr.as_ptr());
             #[cfg(debug_assertions)]
@@ -590,13 +590,13 @@ impl<'ctx> Context<'ctx> {
         unsafe {
             let cstr = CString::new(name_ref).unwrap();
             let ptr = gccjit_sys::gcc_jit_context_new_function(self.ptr,
-                                                               loc_ptr,
-                                                               mem::transmute(kind),
-                                                               types::get_ptr(&return_ty),
-                                                               cstr.as_ptr(),
-                                                               num_params,
-                                                               params_ptrs.as_mut_ptr(),
-                                                               is_variadic as i32);
+                loc_ptr,
+                mem::transmute::<FunctionType, gccjit_sys::gcc_jit_function_kind>(kind),
+                types::get_ptr(&return_ty),
+                cstr.as_ptr(),
+                num_params,
+                params_ptrs.as_mut_ptr(),
+                is_variadic as i32);
             #[cfg(debug_assertions)]
             if let Ok(Some(error)) = self.get_last_error() {
                 panic!("{}", error);
@@ -620,11 +620,11 @@ impl<'ctx> Context<'ctx> {
         };
         unsafe {
             let ptr = gccjit_sys::gcc_jit_context_new_binary_op(self.ptr,
-                                                                loc_ptr,
-                                                                mem::transmute(op),
-                                                                types::get_ptr(&ty),
-                                                                rvalue::get_ptr(&left_rvalue),
-                                                                rvalue::get_ptr(&right_rvalue));
+                loc_ptr,
+                mem::transmute::<BinaryOp, gccjit_sys::gcc_jit_binary_op>(op),
+                types::get_ptr(&ty),
+                rvalue::get_ptr(&left_rvalue),
+                rvalue::get_ptr(&right_rvalue));
             #[cfg(debug_assertions)]
             if let Ok(Some(error)) = self.get_last_error() {
                 panic!("{}", error);
@@ -646,10 +646,10 @@ impl<'ctx> Context<'ctx> {
         };
         unsafe {
             let ptr = gccjit_sys::gcc_jit_context_new_unary_op(self.ptr,
-                                                               loc_ptr,
-                                                               mem::transmute(op),
-                                                               types::get_ptr(&ty),
-                                                               rvalue::get_ptr(&rvalue));
+                loc_ptr,
+                mem::transmute::<UnaryOp, gccjit_sys::gcc_jit_unary_op>(op),
+                types::get_ptr(&ty),
+                rvalue::get_ptr(&rvalue));
             #[cfg(debug_assertions)]
             if let Ok(Some(error)) = self.get_last_error() {
                 panic!("{}", error);
@@ -671,10 +671,10 @@ impl<'ctx> Context<'ctx> {
         };
         unsafe {
             let ptr = gccjit_sys::gcc_jit_context_new_comparison(self.ptr,
-                                                                 loc_ptr,
-                                                                 mem::transmute(op),
-                                                                 rvalue::get_ptr(&left_rvalue),
-                                                                 rvalue::get_ptr(&right_rvalue));
+                loc_ptr,
+                mem::transmute::<ComparisonOp, gccjit_sys::gcc_jit_comparison>(op),
+                rvalue::get_ptr(&left_rvalue),
+                rvalue::get_ptr(&right_rvalue));
             #[cfg(debug_assertions)]
             if let Ok(Some(error)) = self.get_last_error() {
                 panic!("{}", error);
@@ -1007,8 +1007,8 @@ impl<'ctx> Context<'ctx> {
                                    value: *mut ()) -> RValue<'a> {
         unsafe {
             let ptr = gccjit_sys::gcc_jit_context_new_rvalue_from_ptr(self.ptr,
-                                                                      types::get_ptr(&ty),
-                                                                      mem::transmute(value));
+                types::get_ptr(&ty),
+                mem::transmute::<*mut (), *mut c_void>(value));
             #[cfg(debug_assertions)]
             if let Ok(Some(error)) = self.get_last_error() {
                 panic!("{}", error);

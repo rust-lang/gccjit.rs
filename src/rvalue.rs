@@ -64,11 +64,11 @@ macro_rules! binary_operator_for {
                     let ctx_ptr = gccjit_sys::gcc_jit_object_get_context(obj_ptr);
                     let ty = rhs.get_type();
                     let ptr = gccjit_sys::gcc_jit_context_new_binary_op(ctx_ptr,
-                                                                        ptr::null_mut(),
-                                                                        mem::transmute($op),
-                                                                        types::get_ptr(&ty),
-                                                                        self.ptr,
-                                                                        rhs_rvalue.ptr);
+                        ptr::null_mut(),
+                        mem::transmute::<BinaryOp, gccjit_sys::gcc_jit_binary_op>($op),
+                        types::get_ptr(&ty),
+                        self.ptr,
+                        rhs_rvalue.ptr);
                     #[cfg(debug_assertions)]
                     if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
                         panic!("{}", error);

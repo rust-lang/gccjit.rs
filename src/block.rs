@@ -175,10 +175,10 @@ impl<'ctx> Block<'ctx> {
         };
         unsafe {
             gccjit_sys::gcc_jit_block_add_assignment_op(self.ptr,
-                                                        loc_ptr,
-                                                        lvalue::get_ptr(&lvalue),
-                                                        mem::transmute(op),
-                                                        rvalue::get_ptr(&rvalue));
+                loc_ptr,
+                lvalue::get_ptr(&lvalue),
+                mem::transmute::<BinaryOp, gccjit_sys::gcc_jit_binary_op>(op),
+                rvalue::get_ptr(&rvalue));
         }
     }
 
