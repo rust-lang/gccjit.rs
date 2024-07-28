@@ -5,7 +5,7 @@ authors = ["Sean Gillespie <sean.william.g@gmail.com>", "Antoni Boucher <bouanto
 description = "Higher-level Rust bindings for libgccjit."
 keywords = ["compiler", "jit", "gcc"]
 license = "GPL-3.0"
-repository = "https://github.com/antoyo/gccjit.rs"
+repository = "https://github.com/rust-lang/gccjit.rs"
 documentation = "https://docs.rs/gccjit/latest/gccjit/"
 readme = "README.md"
 
