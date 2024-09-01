@@ -283,6 +283,7 @@ pub enum gcc_jit_fn_attribute
 pub enum gcc_jit_variable_attribute
 {
     GCC_JIT_VARIABLE_ATTRIBUTE_VISIBILITY,
+    GCC_JIT_VARIABLE_ATTRIBUTE_WEAK,
 }
 
 #[link(name = "gccjit")]
@@ -688,4 +689,7 @@ extern {
 
     #[cfg(feature="master")]
     pub fn gcc_jit_rvalue_set_type(rvalue: *mut gcc_jit_rvalue, new_type: *mut gcc_jit_type);
+
+    #[cfg(feature="master")]
+    pub fn gcc_jit_lvalue_add_attribute(variable: *mut gcc_jit_lvalue, attribute: gcc_jit_variable_attribute);
 }

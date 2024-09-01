@@ -45,6 +45,7 @@ pub enum AttributeValue<'a> {
 #[derive(Clone, Copy, Debug)]
 pub enum VarAttribute {
     Visibility(Visibility),
+    Weak,
 }
 
 #[cfg(feature="master")]
@@ -52,12 +53,14 @@ impl VarAttribute {
     fn get_value(&self) -> AttributeValue {
         match *self {
             Self::Visibility(visibility) => AttributeValue::String(visibility.as_str()),
+            Self::Weak => AttributeValue::None,
         }
     }
 
     fn to_sys(self) -> gccjit_sys::gcc_jit_variable_attribute {
         match self {
             VarAttribute::Visibility(_) => gccjit_sys::gcc_jit_variable_attribute::GCC_JIT_VARIABLE_ATTRIBUTE_VISIBILITY,
+            VarAttribute::Weak => gccjit_sys::gcc_jit_variable_attribute::GCC_JIT_VARIABLE_ATTRIBUTE_WEAK,
         }
     }
 }
@@ -224,12 +227,16 @@ impl<'ctx> LValue<'ctx> {
     }
 
     #[cfg(feature="master")]
-    pub fn add_string_attribute(&self, attribute: VarAttribute) {
+    pub fn add_attribute(&self, attribute: VarAttribute) {
         let value = attribute.get_value();
         match value {
             AttributeValue::Int(_) => unimplemented!(),
             AttributeValue::IntArray(_) => unimplemented!(),
-            AttributeValue::None => unimplemented!(),
+            AttributeValue::None => {
+                unsafe {
+                    gccjit_sys::gcc_jit_lvalue_add_attribute(self.ptr, attribute.to_sys());
+                }
+            },
             AttributeValue::String(string) => {
                 let cstr = CString::new(string).unwrap();
                 unsafe {
