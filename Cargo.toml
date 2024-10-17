@@ -13,4 +13,4 @@ readme = "README.md"
 master = ["gccjit_sys/master"]
 
 [dependencies]
-gccjit_sys = { version = "0.3.0", path = "gccjit_sys" }
+gccjit_sys = { version = "0.4.0", path = "gccjit_sys" }
