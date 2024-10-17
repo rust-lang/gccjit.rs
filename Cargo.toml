@@ -1,6 +1,6 @@
 [package]
 name = "gccjit"
-version = "2.2.0"
+version = "2.3.0"
 authors = ["Sean Gillespie <sean.william.g@gmail.com>", "Antoni Boucher <bouanto@zoho.com>"]
 description = "Higher-level Rust bindings for libgccjit."
 keywords = ["compiler", "jit", "gcc"]
