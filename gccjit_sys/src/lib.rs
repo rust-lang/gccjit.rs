@@ -659,9 +659,6 @@ extern {
     pub fn gcc_jit_target_info_arch(info: *mut gcc_jit_target_info) -> *const c_char;
 
     #[cfg(feature="master")]
-    pub fn gcc_jit_target_info_supports_128bit_int(info: *mut gcc_jit_target_info) -> c_int;
-
-    #[cfg(feature="master")]
     pub fn gcc_jit_target_info_supports_target_dependent_type(info: *mut gcc_jit_target_info, ty: gcc_jit_types) -> c_int;
 
     #[cfg(feature="master")]
