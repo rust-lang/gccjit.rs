@@ -614,9 +614,6 @@ extern {
     pub fn gcc_jit_type_set_packed(typ: *mut gcc_jit_type);
 
     #[cfg(feature="master")]
-    pub fn gcc_jit_type_is_const(typ: *mut gcc_jit_type) -> *mut gcc_jit_type;
-
-    #[cfg(feature="master")]
     pub fn gcc_jit_context_convert_vector(ctxt: *mut gcc_jit_context, loc: *mut gcc_jit_location, vector: *mut gcc_jit_rvalue, type_: *mut gcc_jit_type) -> *mut gcc_jit_rvalue;
 
     #[cfg(feature="master")]
@@ -680,9 +677,6 @@ extern {
 
     #[cfg(feature="master")]
     pub fn gcc_jit_context_new_alignof(ctxt: *mut gcc_jit_context, typ: *mut gcc_jit_type) -> *mut gcc_jit_rvalue;
-
-    #[cfg(feature="master")]
-    pub fn gcc_jit_lvalue_remove(lvalue: *mut gcc_jit_lvalue);
 
     #[cfg(feature="master")]
     pub fn gcc_jit_rvalue_set_type(rvalue: *mut gcc_jit_rvalue, new_type: *mut gcc_jit_type);

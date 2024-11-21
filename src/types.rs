@@ -233,17 +233,6 @@ impl<'ctx> Type<'ctx> {
         }
     }
 
-    #[cfg(feature="master")]
-    pub fn is_const(&self) -> Option<Type<'ctx>> {
-        unsafe {
-            let value = gccjit_sys::gcc_jit_type_is_const(self.ptr);
-            if value.is_null() {
-                return None;
-            }
-            Some(from_ptr(value))
-        }
-    }
-
     pub fn is_compatible_with(&self, typ: Type<'ctx>) -> bool {
         unsafe {
             gccjit_sys::gcc_jit_compatible_types(self.ptr, typ.ptr)

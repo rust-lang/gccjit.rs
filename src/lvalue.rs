@@ -180,13 +180,6 @@ impl<'ctx> LValue<'ctx> {
         }
     }
 
-    #[cfg(feature="master")]
-    pub fn remove(&self) {
-        unsafe {
-            gccjit_sys::gcc_jit_lvalue_remove(self.ptr);
-        }
-    }
-
     pub fn set_tls_model(&self, model: TlsModel) {
         unsafe {
             gccjit_sys::gcc_jit_lvalue_set_tls_model(self.ptr, model.to_sys());
