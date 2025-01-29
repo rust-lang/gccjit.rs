@@ -61,7 +61,7 @@ pub use target_info::TargetInfo;
 
 #[cfg(feature="master")]
 pub fn set_global_personality_function_name(name: &'static [u8]) {
-    debug_assert!(name.ends_with(&[b'\0']), "Expecting a NUL-terminated C string");
+    debug_assert!(name.ends_with(b"\0"), "Expecting a NUL-terminated C string");
     unsafe {
         gccjit_sys::gcc_jit_set_global_personality_function_name(name.as_ptr() as *const _);
     }
