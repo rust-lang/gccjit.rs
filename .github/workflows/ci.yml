@@ -24,8 +24,8 @@ jobs:
 
       - name: Download and install GCC fork
         run: |
-          curl -LO https://github.com/antoyo/gcc/releases/latest/download/gcc-13.deb
-          sudo dpkg --force-overwrite -i gcc-13.deb
+          curl -LO https://github.com/antoyo/gcc/releases/latest/download/gcc-15.deb
+          sudo dpkg --force-overwrite -i gcc-15.deb
 
       - name: Set env
         run: |
