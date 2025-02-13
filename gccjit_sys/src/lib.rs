@@ -276,6 +276,8 @@ pub enum gcc_jit_fn_attribute
     GCC_JIT_FN_ATTRIBUTE_CONST,
     GCC_JIT_FN_ATTRIBUTE_WEAK,
     GCC_JIT_FN_ATTRIBUTE_NONNULL,
+    GCC_JIT_FN_ATTRIBUTE_MS_ABI,
+    GCC_JIT_FN_ATTRIBUTE_SYSV_ABI,
 }
 
 #[cfg(feature="master")]

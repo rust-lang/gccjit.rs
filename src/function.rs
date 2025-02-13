@@ -60,6 +60,8 @@ pub enum FnAttribute<'a> {
     Const,
     Weak,
     NonNull(Vec<std::ffi::c_int>),
+    MsAbi,
+    SysvAbi,
 }
 
 #[cfg(feature="master")]
@@ -76,7 +78,9 @@ impl<'a> FnAttribute<'a> {
             | FnAttribute::ReturnsTwice
             | FnAttribute::Pure
             | FnAttribute::Const
-            | FnAttribute::Weak => AttributeValue::None,
+            | FnAttribute::Weak
+            | FnAttribute::MsAbi
+            | FnAttribute::SysvAbi => AttributeValue::None,
             FnAttribute::NonNull(ref value) => {
                 debug_assert!(
                     value.iter().all(|attr| *attr > 0),
@@ -102,6 +106,8 @@ impl<'a> FnAttribute<'a> {
             FnAttribute::Const => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_CONST,
             FnAttribute::Weak => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_WEAK,
             FnAttribute::NonNull(_) => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_NONNULL,
+            FnAttribute::MsAbi => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_MS_ABI,
+            FnAttribute::SysvAbi => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_SYSV_ABI,
         }
     }
 }
