@@ -14,3 +14,6 @@ master = ["gccjit_sys/master"]
 
 [dependencies]
 gccjit_sys = { version = "0.6.0", path = "gccjit_sys" }
+
+[package.metadata.docs.rs]
+features = ["master"]
