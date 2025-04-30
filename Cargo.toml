@@ -1,6 +1,6 @@
 [package]
 name = "gccjit"
-version = "2.5.0"
+version = "2.6.0"
 authors = ["Sean Gillespie <sean.william.g@gmail.com>", "Antoni Boucher <bouanto@zoho.com>"]
 description = "Higher-level Rust bindings for libgccjit."
 keywords = ["compiler", "jit", "gcc"]
@@ -13,7 +13,7 @@ readme = "README.md"
 master = ["gccjit_sys/master"]
 
 [dependencies]
-gccjit_sys = { version = "0.6.0", path = "gccjit_sys" }
+gccjit_sys = { version = "0.7.0", path = "gccjit_sys" }
 
 [package.metadata.docs.rs]
 features = ["master"]
