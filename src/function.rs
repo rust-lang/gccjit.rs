@@ -60,15 +60,27 @@ pub enum FnAttribute<'a> {
     Const,
     Weak,
     NonNull(Vec<std::ffi::c_int>),
-    MsAbi,
-    SysvAbi,
+    ArmPcs(&'a str),
+    AvrInterrupt,
+    AvrNoblock,
+    AvrSignal,
+    GcnAmdGpuHsaKernel,
+    Msp430Interrupt,
+    NvptxKernel,
+    X86FastCall,
+    X86Interrupt,
+    X86MsAbi,
+    X86Stdcall,
+    X86SysvAbi,
+    X86ThisCall,
 }
 
 #[cfg(feature="master")]
 impl<'a> FnAttribute<'a> {
     fn get_value(&self) -> AttributeValue {
         match *self {
-            FnAttribute::Alias(value) | FnAttribute::Target(value) => AttributeValue::String(value),
+            FnAttribute::Alias(value) | FnAttribute::ArmPcs(value) | FnAttribute::Target(value) =>
+                AttributeValue::String(value),
             FnAttribute::Visibility(visibility) => AttributeValue::String(visibility.as_str()),
             FnAttribute::AlwaysInline
             | FnAttribute::Inline
@@ -79,8 +91,18 @@ impl<'a> FnAttribute<'a> {
             | FnAttribute::Pure
             | FnAttribute::Const
             | FnAttribute::Weak
-            | FnAttribute::MsAbi
-            | FnAttribute::SysvAbi => AttributeValue::None,
+            | FnAttribute::AvrInterrupt
+            | FnAttribute::AvrNoblock
+            | FnAttribute::AvrSignal
+            | FnAttribute::GcnAmdGpuHsaKernel
+            | FnAttribute::Msp430Interrupt
+            | FnAttribute::NvptxKernel
+            | FnAttribute::X86FastCall
+            | FnAttribute::X86Interrupt
+            | FnAttribute::X86MsAbi
+            | FnAttribute::X86Stdcall
+            | FnAttribute::X86SysvAbi
+            | FnAttribute::X86ThisCall => AttributeValue::None,
             FnAttribute::NonNull(ref value) => {
                 debug_assert!(
                     value.iter().all(|attr| *attr > 0),
@@ -106,8 +128,19 @@ impl<'a> FnAttribute<'a> {
             FnAttribute::Const => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_CONST,
             FnAttribute::Weak => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_WEAK,
             FnAttribute::NonNull(_) => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_NONNULL,
-            FnAttribute::MsAbi => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_MS_ABI,
-            FnAttribute::SysvAbi => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_SYSV_ABI,
+            FnAttribute::ArmPcs(_) => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_ARM_PCS,
+            FnAttribute::AvrInterrupt => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_AVR_INTERRUPT,
+            FnAttribute::AvrNoblock => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_AVR_NOBLOCK,
+            FnAttribute::AvrSignal => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_AVR_SIGNAL,
+            FnAttribute::GcnAmdGpuHsaKernel => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_GCN_AMDGPU_HSA_KERNEL,
+            FnAttribute::Msp430Interrupt => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_MSP430_INTERRUPT,
+            FnAttribute::NvptxKernel => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_NVPTX_KERNEL,
+            FnAttribute::X86FastCall => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_X86_FAST_CALL,
+            FnAttribute::X86Interrupt => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_X86_INTERRUPT,
+            FnAttribute::X86MsAbi => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_X86_MS_ABI,
+            FnAttribute::X86Stdcall => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_X86_STDCALL,
+            FnAttribute::X86SysvAbi => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_X86_SYSV_ABI,
+            FnAttribute::X86ThisCall => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_X86_THIS_CALL,
         }
     }
 }

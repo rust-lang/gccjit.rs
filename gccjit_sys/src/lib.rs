@@ -276,8 +276,19 @@ pub enum gcc_jit_fn_attribute
     GCC_JIT_FN_ATTRIBUTE_CONST,
     GCC_JIT_FN_ATTRIBUTE_WEAK,
     GCC_JIT_FN_ATTRIBUTE_NONNULL,
-    GCC_JIT_FN_ATTRIBUTE_MS_ABI,
-    GCC_JIT_FN_ATTRIBUTE_SYSV_ABI,
+    GCC_JIT_FN_ATTRIBUTE_ARM_PCS,
+    GCC_JIT_FN_ATTRIBUTE_AVR_INTERRUPT,
+    GCC_JIT_FN_ATTRIBUTE_AVR_NOBLOCK,
+    GCC_JIT_FN_ATTRIBUTE_AVR_SIGNAL,
+    GCC_JIT_FN_ATTRIBUTE_GCN_AMDGPU_HSA_KERNEL,
+    GCC_JIT_FN_ATTRIBUTE_MSP430_INTERRUPT,
+    GCC_JIT_FN_ATTRIBUTE_NVPTX_KERNEL,
+    GCC_JIT_FN_ATTRIBUTE_X86_FAST_CALL,
+    GCC_JIT_FN_ATTRIBUTE_X86_INTERRUPT,
+    GCC_JIT_FN_ATTRIBUTE_X86_MS_ABI,
+    GCC_JIT_FN_ATTRIBUTE_X86_STDCALL,
+    GCC_JIT_FN_ATTRIBUTE_X86_SYSV_ABI,
+    GCC_JIT_FN_ATTRIBUTE_X86_THIS_CALL,
 }
 
 #[cfg(feature="master")]
@@ -289,7 +300,7 @@ pub enum gcc_jit_variable_attribute
 }
 
 #[link(name = "gccjit")]
-extern {
+extern "C" {
     // context operations
     pub fn gcc_jit_context_acquire() -> *mut gcc_jit_context;
     pub fn gcc_jit_context_release(ctx: *mut gcc_jit_context);
