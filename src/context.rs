@@ -1180,7 +1180,7 @@ impl<'ctx> Context<'ctx> {
     pub fn set_logfile<S: AsRef<str>>(&self, _logfile: S) {
         use std::os::raw::c_void;
 
-        extern {
+        extern "C" {
             static stderr: *mut c_void;
         }
 
