@@ -212,7 +212,7 @@ impl<'ctx> Type<'ctx> {
     pub fn get_size(&self) -> u32 {
         unsafe {
             let size = gccjit_sys::gcc_jit_type_get_size(self.ptr);
-            assert_ne!(size, -1, "called get_size of unsupported type: {:?}", self);
+            assert_ne!(size, -1, "called get_size of unsupported type: {self:?}");
             size as u32
         }
     }

@@ -1,6 +1,7 @@
 use std::{ffi::CString, marker::PhantomData};
 use std::fmt;
 use std::ptr;
+
 use context::Context;
 use rvalue::{RValue, ToRValue};
 use rvalue;
@@ -236,6 +237,18 @@ impl<'ctx> LValue<'ctx> {
                     gccjit_sys::gcc_jit_lvalue_add_string_attribute(self.ptr, attribute.to_sys(), cstr.as_ptr());
                 }
             },
+        }
+    }
+
+    #[cfg(feature = "master")]
+    pub fn get_name(&self) -> Option<&'ctx str> {
+        unsafe {
+            let str = gccjit_sys::gcc_jit_lvalue_get_name(self.ptr);
+            if str.is_null() {
+                None
+            } else {
+                Some(std::ffi::CStr::from_ptr(str).to_str().expect("invalid lvalue name"))
+            }
         }
     }
 }

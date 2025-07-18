@@ -699,4 +699,7 @@ extern "C" {
 
     #[cfg(feature="master")]
     pub fn gcc_jit_lvalue_add_attribute(variable: *mut gcc_jit_lvalue, attribute: gcc_jit_variable_attribute);
+
+    #[cfg(feature="master")]
+    pub fn gcc_jit_lvalue_get_name(lvalue: *mut gcc_jit_lvalue) -> *const c_char;
 }
