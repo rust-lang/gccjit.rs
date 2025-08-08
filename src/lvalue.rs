@@ -51,7 +51,7 @@ pub enum VarAttribute {
 
 #[cfg(feature="master")]
 impl VarAttribute {
-    fn get_value(&self) -> AttributeValue {
+    fn get_value(&self) -> AttributeValue<'_> {
         match *self {
             Self::Visibility(visibility) => AttributeValue::String(visibility.as_str()),
             Self::Weak => AttributeValue::None,
@@ -249,6 +249,14 @@ impl<'ctx> LValue<'ctx> {
             } else {
                 Some(std::ffi::CStr::from_ptr(str).to_str().expect("invalid lvalue name"))
             }
+        }
+    }
+
+    #[cfg(feature = "master")]
+    pub fn set_name(&self, new_name: &str) {
+        let new_name = CString::new(new_name).unwrap();
+        unsafe {
+            gccjit_sys::gcc_jit_lvalue_set_name(self.ptr, new_name.as_ptr());
         }
     }
 }
