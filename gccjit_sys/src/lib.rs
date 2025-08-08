@@ -702,4 +702,7 @@ extern "C" {
 
     #[cfg(feature="master")]
     pub fn gcc_jit_lvalue_get_name(lvalue: *mut gcc_jit_lvalue) -> *const c_char;
+
+    #[cfg(feature="master")]
+    pub fn gcc_jit_lvalue_set_name(lvalue: *mut gcc_jit_lvalue, new_name: *const c_char);
 }
