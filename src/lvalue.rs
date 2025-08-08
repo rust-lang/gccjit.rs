@@ -51,7 +51,7 @@ pub enum VarAttribute {
 
 #[cfg(feature="master")]
 impl VarAttribute {
-    fn get_value(&self) -> AttributeValue {
+    fn get_value(&self) -> AttributeValue<'_> {
         match *self {
             Self::Visibility(visibility) => AttributeValue::String(visibility.as_str()),
             Self::Weak => AttributeValue::None,

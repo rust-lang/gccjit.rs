@@ -80,7 +80,7 @@ pub enum FnAttribute<'a> {
 
 #[cfg(feature="master")]
 impl<'a> FnAttribute<'a> {
-    fn get_value(&self) -> AttributeValue {
+    fn get_value(&self) -> AttributeValue<'_> {
         match *self {
             FnAttribute::Alias(value) | FnAttribute::ArmPcs(value)| FnAttribute::RiscvInterrupt(value)
                 | FnAttribute::Target(value) => AttributeValue::String(value),
