@@ -705,4 +705,7 @@ extern "C" {
 
     #[cfg(feature="master")]
     pub fn gcc_jit_lvalue_set_name(lvalue: *mut gcc_jit_lvalue, new_name: *const c_char);
+
+    #[cfg(feature="master")]
+    pub fn gcc_jit_is_lto_supported() -> bool;
 }

@@ -85,3 +85,10 @@ impl Version {
         }
     }
 }
+
+#[cfg(feature="master")]
+pub fn is_lto_supported() -> bool {
+    unsafe {
+        gccjit_sys::gcc_jit_is_lto_supported()
+    }
+}
