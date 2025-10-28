@@ -708,4 +708,7 @@ extern "C" {
 
     #[cfg(feature="master")]
     pub fn gcc_jit_is_lto_supported() -> bool;
+
+    #[cfg(feature="master")]
+    pub fn gcc_jit_type_set_addressable(typ: *mut gcc_jit_type);
 }
