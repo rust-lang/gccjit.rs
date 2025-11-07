@@ -10,6 +10,7 @@ repository = "https://github.com/rust-lang/gccjit.rs"
 
 [features]
 master = []
+dlopen = []
 
 [dependencies]
 libc = "0.2"
