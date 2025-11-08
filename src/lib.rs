@@ -33,6 +33,7 @@ mod block;
 #[cfg(feature="master")]
 mod target_info;
 
+#[cfg(feature="dlopen")]
 use std::cell::RefCell;
 #[cfg(feature="dlopen")]
 use std::ffi::CStr;
@@ -105,6 +106,12 @@ pub fn is_lto_supported() -> bool {
     })
 }
 
+#[cfg(not(feature="dlopen"))]
+fn with_lib<T, F: Fn(&Libgccjit) -> T>(callback: F) -> T {
+    callback(&LIB)
+}
+
+#[cfg(feature="dlopen")]
 fn with_lib<T, F: Fn(&Libgccjit) -> T>(callback: F) -> T {
     LIB.with(|lib| {
         #[cfg(not(feature="dlopen"))]
@@ -126,6 +133,12 @@ pub fn load(path: &CStr) {
     });
 }
 
+#[cfg(feature="dlopen")]
 thread_local! {
-    pub static LIB: RefCell<Option<Libgccjit>> = RefCell::new(None);
+    pub static LIB: RefCell<Option<Libgccjit>> = const { RefCell::new(None) };
 }
+
+// Without the dlopen feature, we avoid using thread_local and RefCell as to not have any
+// performance impact.
+#[cfg(not(feature="dlopen"))]
+static LIB: Libgccjit = Libgccjit::new();

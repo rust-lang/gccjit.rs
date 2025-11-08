@@ -330,23 +330,24 @@ macro_rules! extern_maybe_dlopen {
         }
 
         impl Libgccjit {
-            pub unsafe fn open(
-                #[cfg(feature="dlopen")]
-                path: &CStr
-            ) -> Option<Self>
-            {
-                #[cfg(feature="dlopen")]
+            #[cfg(not(feature="dlopen"))]
+            #[allow(clippy::new_without_default)]
+            pub const fn new() -> Self {
+                Self {
+                }
+            }
+
+            #[cfg(feature="dlopen")]
+            pub unsafe fn open(path: &CStr) -> Option<Self> {
                 let lib = unsafe { dynload::Library::open(path)? };
 
                 Some(Self {
                     $(
-                    #[cfg(feature="dlopen")]
                     $(#[cfg($attr_name=$attr_value)])?
-                    $func_name: unsafe { std::mem::transmute(lib.get(
-                        CStr::from_bytes_with_nul_unchecked(concat!(stringify!($func_name), "\0").as_bytes())
+                    $func_name: unsafe { std::mem::transmute::<*mut (), unsafe extern "C" fn($($arg_type),*) $(-> $return_type)?>(
+                        lib.get(CStr::from_bytes_with_nul_unchecked(concat!(stringify!($func_name), "\0").as_bytes())
                     )?) },
                     )*
-                    #[cfg(feature="dlopen")]
                     _lib: lib,
                 })
             }
