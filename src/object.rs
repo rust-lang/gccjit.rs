@@ -4,7 +4,7 @@ use std::fmt;
 use std::ffi::CStr;
 use std::str;
 
-use crate::context;
+use crate::{context, with_lib};
 
 /// Object represents the root of all objects in gccjit. It is not useful
 /// in and of itself, but it provides the implementation for Debug
@@ -17,12 +17,15 @@ pub struct Object<'ctx> {
 
 impl<'ctx> fmt::Debug for Object<'ctx> {
     fn fmt<'a>(&self, fmt: &mut fmt::Formatter<'a>) -> Result<(), fmt::Error> {
-        unsafe {
-            let ptr = gccjit_sys::gcc_jit_object_get_debug_string(self.ptr);
-            let cstr = CStr::from_ptr(ptr);
-            let rust_str = str::from_utf8_unchecked(cstr.to_bytes());
-            fmt.write_str(rust_str)
-        }
+        let rust_str =
+            with_lib(|lib| {
+                unsafe {
+                    let ptr = lib.gcc_jit_object_get_debug_string(self.ptr);
+                    let cstr = CStr::from_ptr(ptr);
+                    str::from_utf8_unchecked(cstr.to_bytes())
+                }
+            });
+        fmt.write_str(rust_str)
     }
 }
 
@@ -44,11 +47,13 @@ impl<'ctx> Deref for ContextRef<'ctx> {
 
 impl<'ctx> Object<'ctx> {
     pub fn get_context(&self) -> ContextRef<'ctx> {
-        unsafe {
-            ContextRef {
-                context: ManuallyDrop::new(context::from_ptr(gccjit_sys::gcc_jit_object_get_context(self.ptr))),
+        with_lib(|lib| {
+            unsafe {
+                ContextRef {
+                    context: ManuallyDrop::new(context::from_ptr(lib.gcc_jit_object_get_context(self.ptr))),
+                }
             }
-        }
+        })
     }
 }
 

@@ -8,6 +8,8 @@ use rvalue;
 use lvalue::{LValue, ToLValue};
 use lvalue;
 
+use crate::with_lib;
+
 /// Parameter represents a parameter to a function. A series of parameteres
 /// can be combined to form a function signature.
 #[derive(Copy, Clone, PartialEq)]
@@ -18,9 +20,11 @@ pub struct Parameter<'ctx> {
 
 impl<'ctx> ToObject<'ctx> for Parameter<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        unsafe {
-            object::from_ptr(gccjit_sys::gcc_jit_param_as_object(self.ptr))
-        }
+        with_lib(|lib| {
+            unsafe {
+                object::from_ptr(lib.gcc_jit_param_as_object(self.ptr))
+            }
+        })
     }
 }
 
@@ -33,19 +37,23 @@ impl<'ctx> fmt::Debug for Parameter<'ctx> {
 
 impl<'ctx> ToRValue<'ctx> for Parameter<'ctx> {
     fn to_rvalue(&self) -> RValue<'ctx> {
-        unsafe {
-            let ptr = gccjit_sys::gcc_jit_param_as_rvalue(self.ptr);
-            rvalue::from_ptr(ptr)
-        }
+        with_lib(|lib| {
+            unsafe {
+                let ptr = lib.gcc_jit_param_as_rvalue(self.ptr);
+                rvalue::from_ptr(ptr)
+            }
+        })
     }
 }
 
 impl<'ctx> ToLValue<'ctx> for Parameter<'ctx> {
     fn to_lvalue(&self) -> LValue<'ctx> {
-        unsafe {
-            let ptr = gccjit_sys::gcc_jit_param_as_lvalue(self.ptr);
-            lvalue::from_ptr(ptr)
-        }
+        with_lib(|lib| {
+            unsafe {
+                let ptr = lib.gcc_jit_param_as_lvalue(self.ptr);
+                lvalue::from_ptr(ptr)
+            }
+        })
     }
 }
 

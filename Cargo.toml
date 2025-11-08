@@ -11,6 +11,7 @@ readme = "README.md"
 
 [features]
 master = ["gccjit_sys/master"]
+dlopen = ["gccjit_sys/dlopen"]
 
 [dependencies]
 gccjit_sys = { version = "0.9.0", path = "gccjit_sys" }

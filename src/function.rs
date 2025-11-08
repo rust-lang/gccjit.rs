@@ -20,6 +20,8 @@ use std::ffi::CString;
 use types::Type;
 use types;
 
+use crate::with_lib;
+
 /// FunctionType informs gccjit what sort of function a new function will be.
 /// An exported function is a function that will be exported using the CompileResult
 /// interface, able to be called outside of the jit. An internal function is
@@ -164,10 +166,12 @@ pub struct Function<'ctx> {
 
 impl<'ctx> ToObject<'ctx> for Function<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        unsafe {
-            let ptr = gccjit_sys::gcc_jit_function_as_object(self.ptr);
-            object::from_ptr(ptr)
-        }
+        with_lib(|lib| {
+            unsafe {
+                let ptr = lib.gcc_jit_function_as_object(self.ptr);
+                object::from_ptr(ptr)
+            }
+        })
     }
 }
 
@@ -180,143 +184,161 @@ impl<'ctx> fmt::Debug for Function<'ctx> {
 
 impl<'ctx> Function<'ctx> {
     pub fn get_param(&self, idx: i32) -> Parameter<'ctx> {
-        unsafe {
-            let ptr = gccjit_sys::gcc_jit_function_get_param(self.ptr, idx);
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-                panic!("{} ({:?})", error, self);
+        with_lib(|lib| {
+            unsafe {
+                let ptr = lib.gcc_jit_function_get_param(self.ptr, idx);
+                #[cfg(debug_assertions)]
+                if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
+                    panic!("{} ({:?})", error, self);
+                }
+                parameter::from_ptr(ptr)
             }
-            parameter::from_ptr(ptr)
-        }
+        })
     }
 
     pub fn get_param_count(&self) -> usize {
-        unsafe {
-            gccjit_sys::gcc_jit_function_get_param_count(self.ptr) as usize
-        }
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_function_get_param_count(self.ptr) as usize
+            }
+        })
     }
 
     pub fn get_return_type(&self) -> Type<'ctx> {
-        unsafe {
-            types::from_ptr(gccjit_sys::gcc_jit_function_get_return_type(self.ptr))
-        }
+        with_lib(|lib| {
+            unsafe {
+                types::from_ptr(lib.gcc_jit_function_get_return_type(self.ptr))
+            }
+        })
     }
 
     pub fn get_address(&self, loc: Option<Location<'ctx>>) -> RValue<'ctx> {
-        unsafe {
-            let loc_ptr = match loc {
-                Some(loc) => location::get_ptr(&loc),
-                None => ptr::null_mut()
-            };
-            let ptr = gccjit_sys::gcc_jit_function_get_address(self.ptr, loc_ptr);
-            rvalue::from_ptr(ptr)
-        }
+        with_lib(|lib| {
+            unsafe {
+                let loc_ptr = match loc {
+                    Some(loc) => location::get_ptr(&loc),
+                    None => ptr::null_mut()
+                };
+                let ptr = lib.gcc_jit_function_get_address(self.ptr, loc_ptr);
+                rvalue::from_ptr(ptr)
+            }
+        })
     }
 
     pub fn dump_to_dot<S: AsRef<str>>(&self, path: S) {
-        unsafe {
-            let cstr = CString::new(path.as_ref()).unwrap();
-            gccjit_sys::gcc_jit_function_dump_to_dot(self.ptr, cstr.as_ptr());
-        }
+        with_lib(|lib| {
+            unsafe {
+                let cstr = CString::new(path.as_ref()).unwrap();
+                lib.gcc_jit_function_dump_to_dot(self.ptr, cstr.as_ptr());
+            }
+        })
     }
 
     pub fn new_block<S: AsRef<str>>(&self, name: S) -> Block<'ctx> {
-        unsafe {
-            let cstr = CString::new(name.as_ref()).unwrap();
-            let ptr = gccjit_sys::gcc_jit_function_new_block(self.ptr,
-                                                             cstr.as_ptr());
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-                panic!("{} ({:?})", error, self);
+        with_lib(|lib| {
+            unsafe {
+                let cstr = CString::new(name.as_ref()).unwrap();
+                let ptr = lib.gcc_jit_function_new_block(self.ptr,
+                    cstr.as_ptr());
+                #[cfg(debug_assertions)]
+                if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
+                    panic!("{} ({:?})", error, self);
+                }
+                block::from_ptr(ptr)
             }
-            block::from_ptr(ptr)
-        }
+        })
     }
 
     #[cfg(feature="master")]
     pub fn set_personality_function(&self, personality_func: Function<'ctx>) {
-        unsafe {
-            gccjit_sys::gcc_jit_function_set_personality_function(self.ptr, personality_func.ptr);
-        }
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_function_set_personality_function(self.ptr, personality_func.ptr);
+            }
+        })
     }
 
     pub fn new_local<S: AsRef<str>>(&self,
                      loc: Option<Location<'ctx>>,
                      ty: Type<'ctx>,
                      name: S) -> LValue<'ctx> {
-        unsafe {
-            let loc_ptr = match loc {
-                Some(loc) => location::get_ptr(&loc),
-                None => ptr::null_mut()
-            };
-            let cstr = CString::new(name.as_ref()).unwrap();
-            let ptr = gccjit_sys::gcc_jit_function_new_local(self.ptr,
-                                                             loc_ptr,
-                                                             types::get_ptr(&ty),
-                                                             cstr.as_ptr());
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-                panic!("{} ({:?})", error, self);
+        with_lib(|lib| {
+            unsafe {
+                let loc_ptr = match loc {
+                    Some(loc) => location::get_ptr(&loc),
+                    None => ptr::null_mut()
+                };
+                let cstr = CString::new(name.as_ref()).unwrap();
+                let ptr = lib.gcc_jit_function_new_local(self.ptr, loc_ptr, types::get_ptr(&ty),
+                    cstr.as_ptr());
+                #[cfg(debug_assertions)]
+                if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
+                    panic!("{} ({:?})", error, self);
+                }
+                lvalue::from_ptr(ptr)
             }
-            lvalue::from_ptr(ptr)
-        }
+        })
     }
 
     #[cfg(feature="master")]
     pub fn new_temp(&self, loc: Option<Location<'ctx>>, ty: Type<'ctx>) -> LValue<'ctx> {
-        unsafe {
-            let loc_ptr = match loc {
-                Some(loc) => location::get_ptr(&loc),
-                None => ptr::null_mut()
-            };
-            let ptr = gccjit_sys::gcc_jit_function_new_temp(self.ptr, loc_ptr, types::get_ptr(&ty));
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-                panic!("{} ({:?})", error, self);
+        with_lib(|lib| {
+            unsafe {
+                let loc_ptr = match loc {
+                    Some(loc) => location::get_ptr(&loc),
+                    None => ptr::null_mut()
+                };
+                let ptr = lib.gcc_jit_function_new_temp(self.ptr, loc_ptr, types::get_ptr(&ty));
+                #[cfg(debug_assertions)]
+                if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
+                    panic!("{} ({:?})", error, self);
+                }
+                lvalue::from_ptr(ptr)
             }
-            lvalue::from_ptr(ptr)
-        }
+        })
     }
 
     #[cfg(feature="master")]
     pub fn add_attribute<'a>(&self, attribute: FnAttribute<'a>) {
         let value = attribute.get_value();
-        match value {
-            AttributeValue::Int(value) => {
-                // Basically the same as `IntArray` but for only one element.
-                let value = &[value];
-                unsafe {
-                    gccjit_sys::gcc_jit_function_add_integer_array_attribute(
-                        self.ptr,
-                        attribute.as_sys(),
-                        value.as_ptr(),
-                        value.len() as _,
-                    );
-                }
+        with_lib(|lib| {
+            match value {
+                AttributeValue::Int(value) => {
+                    // Basically the same as `IntArray` but for only one element.
+                    let value = &[value];
+                    unsafe {
+                        lib.gcc_jit_function_add_integer_array_attribute(
+                            self.ptr,
+                            attribute.as_sys(),
+                            value.as_ptr(),
+                            value.len() as _,
+                        );
+                    }
 
+                }
+                AttributeValue::IntArray(value) => {
+                    unsafe {
+                        lib.gcc_jit_function_add_integer_array_attribute(
+                            self.ptr,
+                            attribute.as_sys(),
+                            value.as_ptr(),
+                            value.len() as _,
+                        );
+                    }
+                }
+                AttributeValue::None => {
+                    unsafe {
+                        lib.gcc_jit_function_add_attribute(self.ptr, attribute.as_sys());
+                    }
+                },
+                AttributeValue::String(string) => {
+                    let cstr = CString::new(string).unwrap();
+                    unsafe {
+                        lib.gcc_jit_function_add_string_attribute(self.ptr, attribute.as_sys(), cstr.as_ptr());
+                    }
+                },
             }
-            AttributeValue::IntArray(value) => {
-                unsafe {
-                    gccjit_sys::gcc_jit_function_add_integer_array_attribute(
-                        self.ptr,
-                        attribute.as_sys(),
-                        value.as_ptr(),
-                        value.len() as _,
-                    );
-                }
-            }
-            AttributeValue::None => {
-                unsafe {
-                    gccjit_sys::gcc_jit_function_add_attribute(self.ptr, attribute.as_sys());
-                }
-            },
-            AttributeValue::String(string) => {
-                let cstr = CString::new(string).unwrap();
-                unsafe {
-                    gccjit_sys::gcc_jit_function_add_string_attribute(self.ptr, attribute.as_sys(), cstr.as_ptr());
-                }
-            },
-        }
+        });
     }
 }
 

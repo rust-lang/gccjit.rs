@@ -5,6 +5,8 @@ use context::Context;
 use object::{ToObject, Object};
 use object;
 
+use crate::with_lib;
+
 /// Field represents a field that composes structs or unions. A number of fields
 /// can be combined to create either a struct or a union.
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
@@ -15,9 +17,11 @@ pub struct Field<'ctx> {
 
 impl<'ctx> ToObject<'ctx> for Field<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        unsafe {
-            object::from_ptr(gccjit_sys::gcc_jit_field_as_object(self.ptr))
-        }
+        with_lib(|lib| {
+            unsafe {
+                object::from_ptr(lib.gcc_jit_field_as_object(self.ptr))
+            }
+        })
     }
 }
 

@@ -33,6 +33,10 @@ mod block;
 #[cfg(feature="master")]
 mod target_info;
 
+use std::cell::RefCell;
+#[cfg(feature="dlopen")]
+use std::ffi::CStr;
+
 pub use context::Context;
 pub use context::CType;
 pub use context::GlobalKind;
@@ -59,12 +63,16 @@ pub use block::{Block, BinaryOp, UnaryOp, ComparisonOp};
 #[cfg(feature="master")]
 pub use target_info::TargetInfo;
 
+use gccjit_sys::Libgccjit;
+
 #[cfg(feature="master")]
 pub fn set_global_personality_function_name(name: &'static [u8]) {
     debug_assert!(name.ends_with(b"\0"), "Expecting a NUL-terminated C string");
-    unsafe {
-        gccjit_sys::gcc_jit_set_global_personality_function_name(name.as_ptr() as *const _);
-    }
+    with_lib(|lib| {
+        unsafe {
+            lib.gcc_jit_set_global_personality_function_name(name.as_ptr() as *const _);
+        }
+    })
 }
 
 #[derive(Debug)]
@@ -76,19 +84,48 @@ pub struct Version {
 
 impl Version {
     pub fn get() -> Self {
-        unsafe {
-            Self {
-                major: gccjit_sys::gcc_jit_version_major(),
-                minor: gccjit_sys::gcc_jit_version_minor(),
-                patch: gccjit_sys::gcc_jit_version_patchlevel(),
+        with_lib(|lib| {
+            unsafe {
+                Self {
+                    major: lib.gcc_jit_version_major(),
+                    minor: lib.gcc_jit_version_minor(),
+                    patch: lib.gcc_jit_version_patchlevel(),
+                }
             }
-        }
+        })
     }
 }
 
 #[cfg(feature="master")]
 pub fn is_lto_supported() -> bool {
-    unsafe {
-        gccjit_sys::gcc_jit_is_lto_supported()
-    }
+    with_lib(|lib| {
+        unsafe {
+            lib.gcc_jit_is_lto_supported()
+        }
+    })
+}
+
+fn with_lib<T, F: Fn(&Libgccjit) -> T>(callback: F) -> T {
+    LIB.with(|lib| {
+        #[cfg(not(feature="dlopen"))]
+        if lib.borrow().is_none() {
+            *lib.borrow_mut() = unsafe { Libgccjit::open() };
+        }
+
+        match *lib.borrow() {
+            Some(ref lib) => callback(lib),
+            None => panic!("libgccjit needs to be loaded by calling load() before attempting to do any operation"),
+        }
+    })
+}
+
+#[cfg(feature="dlopen")]
+pub fn load(path: &CStr) {
+    LIB.with(|lib| {
+        *lib.borrow_mut() = unsafe { Libgccjit::open(path) };
+    });
+}
+
+thread_local! {
+    pub static LIB: RefCell<Option<Libgccjit>> = RefCell::new(None);
 }

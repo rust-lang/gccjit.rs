@@ -14,6 +14,8 @@ use location::{self, Location};
 use rvalue::{self, ToRValue};
 use lvalue::{self, ToLValue};
 
+use crate::with_lib;
+
 /// BinaryOp is a enum representing the various binary operations
 /// that gccjit knows how to codegen.
 #[repr(C)]
@@ -47,7 +49,7 @@ pub enum UnaryOp {
 /// ComparisonOp is an enum representing the various comparisons that
 /// gccjit is capable of doing.
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum ComparisonOp {
     Equals,
     NotEquals,
@@ -64,15 +66,17 @@ pub enum ComparisonOp {
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct Block<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_block
+    ptr: *mut gccjit_sys::gcc_jit_block,
 }
 
 impl<'ctx> ToObject<'ctx> for Block<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        unsafe {
-            let ptr = gccjit_sys::gcc_jit_block_as_object(self.ptr);
-            object::from_ptr(ptr)
-        }
+        with_lib(|lib| {
+            unsafe {
+                let ptr = lib.gcc_jit_block_as_object(self.ptr);
+                object::from_ptr(ptr)
+            }
+        })
     }
 }
 
@@ -85,10 +89,12 @@ impl<'ctx> fmt::Debug for Block<'ctx> {
 
 impl<'ctx> Block<'ctx> {
     pub fn get_function(&self) -> Function<'ctx> {
-        unsafe {
-            let ptr = gccjit_sys::gcc_jit_block_get_function(self.ptr);
-            function::from_ptr(ptr)
-        }
+        with_lib(|lib| {
+            unsafe {
+                let ptr = lib.gcc_jit_block_get_function(self.ptr);
+                function::from_ptr(ptr)
+            }
+        })
     }
 
     /// Evaluates the rvalue parameter and discards its result. Equivalent
@@ -101,11 +107,11 @@ impl<'ctx> Block<'ctx> {
                 Some(loc) => unsafe { location::get_ptr(&loc) },
                 None => ptr::null_mut()
             };
-        unsafe {
-            gccjit_sys::gcc_jit_block_add_eval(self.ptr,
-                                               loc_ptr,
-                                               rvalue::get_ptr(&rvalue));
-        }
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_block_add_eval(self.ptr, loc_ptr, rvalue::get_ptr(&rvalue));
+            }
+        });
         #[cfg(debug_assertions)]
         if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
             panic!("{}", error);
@@ -118,9 +124,11 @@ impl<'ctx> Block<'ctx> {
                 Some(loc) => unsafe { location::get_ptr(&loc) },
                 None => ptr::null_mut()
             };
-        unsafe {
-            gccjit_sys::gcc_jit_block_add_try_catch(self.ptr, loc_ptr, try_block.ptr, catch_block.ptr);
-        }
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_block_add_try_catch(self.ptr, loc_ptr, try_block.ptr, catch_block.ptr);
+            }
+        });
     }
 
     #[cfg(feature="master")]
@@ -129,9 +137,11 @@ impl<'ctx> Block<'ctx> {
                 Some(loc) => unsafe { location::get_ptr(&loc) },
                 None => ptr::null_mut()
             };
-        unsafe {
-            gccjit_sys::gcc_jit_block_add_try_finally(self.ptr, loc_ptr, try_block.ptr, finally_block.ptr);
-        }
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_block_add_try_finally(self.ptr, loc_ptr, try_block.ptr, finally_block.ptr);
+            }
+        });
     }
 
     /// Assigns the value of an rvalue to an lvalue directly. Equivalent
@@ -146,12 +156,12 @@ impl<'ctx> Block<'ctx> {
                 Some(loc) => unsafe { location::get_ptr(&loc) },
                 None => ptr::null_mut()
             };
-        unsafe {
-            gccjit_sys::gcc_jit_block_add_assignment(self.ptr,
-                                                     loc_ptr,
-                                                     lvalue::get_ptr(&lvalue),
-                                                     rvalue::get_ptr(&rvalue));
-        }
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_block_add_assignment(self.ptr, loc_ptr, lvalue::get_ptr(&lvalue),
+                    rvalue::get_ptr(&rvalue));
+            }
+        });
 
         #[cfg(debug_assertions)]
         if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
@@ -173,13 +183,12 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut()
         };
-        unsafe {
-            gccjit_sys::gcc_jit_block_add_assignment_op(self.ptr,
-                loc_ptr,
-                lvalue::get_ptr(&lvalue),
-                mem::transmute::<BinaryOp, gccjit_sys::gcc_jit_binary_op>(op),
-                rvalue::get_ptr(&rvalue));
-        }
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_block_add_assignment_op(self.ptr, loc_ptr, lvalue::get_ptr(&lvalue),
+                    mem::transmute::<BinaryOp, gccjit_sys::gcc_jit_binary_op>(op), rvalue::get_ptr(&rvalue));
+            }
+        });
     }
 
     /// Adds a comment to a block. It's unclear from the documentation what
@@ -192,12 +201,12 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut()
         };
-        unsafe {
-            let cstr = CString::new(message_ref).unwrap();
-            gccjit_sys::gcc_jit_block_add_comment(self.ptr,
-                                                  loc_ptr,
-                                                  cstr.as_ptr());
-        }
+        with_lib(|lib| {
+            unsafe {
+                let cstr = CString::new(message_ref).unwrap();
+                lib.gcc_jit_block_add_comment(self.ptr, loc_ptr, cstr.as_ptr());
+            }
+        });
     }
 
     /// Terminates a block by branching to one of two blocks, depending
@@ -212,13 +221,12 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut()
         };
-        unsafe {
-            gccjit_sys::gcc_jit_block_end_with_conditional(self.ptr,
-                                                           loc_ptr,
-                                                           rvalue::get_ptr(&cond_rvalue),
-                                                           on_true.ptr,
-                                                           on_false.ptr);
-        }
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_block_end_with_conditional(self.ptr, loc_ptr, rvalue::get_ptr(&cond_rvalue),
+                    on_true.ptr, on_false.ptr);
+            }
+        });
         #[cfg(debug_assertions)]
         if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
             panic!("{}", error);
@@ -233,11 +241,11 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut()
         };
-        unsafe {
-            gccjit_sys::gcc_jit_block_end_with_jump(self.ptr,
-                                                    loc_ptr,
-                                                    target.ptr);
-        }
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_block_end_with_jump(self.ptr, loc_ptr, target.ptr);
+            }
+        });
         #[cfg(debug_assertions)]
         if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
             panic!("{}", error);
@@ -256,14 +264,15 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut()
         };
-        unsafe {
-            gccjit_sys::gcc_jit_block_end_with_return(self.ptr,
-                                                      loc_ptr,
-                                                      rvalue::get_ptr(&ret_rvalue));
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-                panic!("{}", error);
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_block_end_with_return(self.ptr, loc_ptr, rvalue::get_ptr(&ret_rvalue));
             }
+        });
+
+        #[cfg(debug_assertions)]
+        if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
+            panic!("{}", error);
         }
     }
 
@@ -276,10 +285,11 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut()
         };
-        unsafe {
-            gccjit_sys::gcc_jit_block_end_with_void_return(self.ptr,
-                                                           loc_ptr);
-        }
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_block_end_with_void_return(self.ptr, loc_ptr);
+            }
+        });
         #[cfg(debug_assertions)]
         if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
             panic!("{}", error);
@@ -292,10 +302,12 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut()
         };
-        unsafe {
-            gccjit_sys::gcc_jit_block_end_with_switch(self.ptr, loc_ptr, rvalue::get_ptr(&expr), block::get_ptr(&default_block),
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_block_end_with_switch(self.ptr, loc_ptr, rvalue::get_ptr(&expr), block::get_ptr(&default_block),
                 cases.len() as c_int, cases.as_ptr() as *mut *mut _);
-        }
+            }
+        });
         #[cfg(debug_assertions)]
         if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
             panic!("{}", error);
@@ -309,9 +321,11 @@ impl<'ctx> Block<'ctx> {
                 Some(loc) => unsafe { location::get_ptr(&loc) },
                 None => ptr::null_mut(),
             };
-        unsafe {
-            ExtendedAsm::from_ptr(gccjit_sys::gcc_jit_block_add_extended_asm(self.ptr, loc_ptr, asm_template.as_ptr()))
-        }
+        with_lib(|lib| {
+            unsafe {
+                ExtendedAsm::from_ptr(lib.gcc_jit_block_add_extended_asm(self.ptr, loc_ptr, asm_template.as_ptr()))
+            }
+        })
     }
 
     pub fn end_with_extended_asm_goto(&self, loc: Option<Location<'ctx>>, asm_template: &str, goto_blocks: &[Block<'ctx>], fallthrough_block: Option<Block<'ctx>>) -> ExtendedAsm<'ctx> {
@@ -326,13 +340,13 @@ impl<'ctx> Block<'ctx> {
                 Some(ref block) => unsafe { get_ptr(block) },
                 None => ptr::null_mut(),
             };
-        unsafe {
-            ExtendedAsm::from_ptr(gccjit_sys::gcc_jit_block_end_with_extended_asm_goto(self.ptr, loc_ptr, asm_template.as_ptr(), goto_blocks.len() as c_int, goto_blocks.as_ptr() as *mut _, fallthrough_block_ptr))
-        }
+        with_lib(|lib| {
+            unsafe {
+                ExtendedAsm::from_ptr(lib.gcc_jit_block_end_with_extended_asm_goto(self.ptr, loc_ptr, asm_template.as_ptr(), goto_blocks.len() as c_int, goto_blocks.as_ptr() as *mut _, fallthrough_block_ptr))
+            }
+        })
     }
 }
-
-
 
 pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_block) -> Block<'ctx> {
     Block {

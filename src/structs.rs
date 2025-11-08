@@ -11,6 +11,8 @@ use location::Location;
 use location;
 use object::{ToObject, Object};
 
+use crate::with_lib;
+
 /// A Struct is gccjit's representation of a composite type. Despite the name,
 /// Struct can represent either a struct, an union, or an opaque named type.
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
@@ -21,10 +23,12 @@ pub struct Struct<'ctx> {
 
 impl<'ctx> Struct<'ctx> {
     pub fn as_type(&self) -> Type<'ctx> {
-        unsafe {
-            let ptr = gccjit_sys::gcc_jit_struct_as_type(self.ptr);
-            types::from_ptr(ptr)
-        }
+        with_lib(|lib| {
+            unsafe {
+                let ptr = lib.gcc_jit_struct_as_type(self.ptr);
+                types::from_ptr(ptr)
+            }
+        })
     }
 
     pub fn set_fields(&self,
@@ -35,15 +39,14 @@ impl<'ctx> Struct<'ctx> {
                 None => ptr::null_mut()
         };
         let num_fields = fields.len() as i32;
-        let mut fields_ptrs : Vec<_> = fields.iter()
-            .map(|x| unsafe { field::get_ptr(x) })
-            .collect();
-        unsafe {
-            gccjit_sys::gcc_jit_struct_set_fields(self.ptr,
-                                                  loc_ptr,
-                                                  num_fields,
-                                                  fields_ptrs.as_mut_ptr());
-        }
+        with_lib(|lib| {
+            let mut fields_ptrs : Vec<_> = fields.iter()
+                .map(|x| unsafe { field::get_ptr(x) })
+                .collect();
+            unsafe {
+                lib.gcc_jit_struct_set_fields(self.ptr, loc_ptr, num_fields, fields_ptrs.as_mut_ptr());
+            }
+        });
         #[cfg(debug_assertions)]
         if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
             panic!("{}", error);
@@ -51,14 +54,17 @@ impl<'ctx> Struct<'ctx> {
     }
 
     pub fn get_field(&self, index: i32) -> Field<'ctx> {
-        let field = unsafe {
-            let ptr = gccjit_sys::gcc_jit_struct_get_field(self.ptr, index);
-            #[cfg(debug_assertions)]
-            if ptr.is_null() {
-                panic!("Null ptr in get_field() from struct: {:?}", self);
-            }
-            field::from_ptr(ptr)
-        };
+        let field =
+            with_lib(|lib| {
+                unsafe {
+                    let ptr = lib.gcc_jit_struct_get_field(self.ptr, index);
+                    #[cfg(debug_assertions)]
+                    if ptr.is_null() {
+                        panic!("Null ptr in get_field() from struct: {:?}", self);
+                    }
+                    field::from_ptr(ptr)
+                }
+            });
         #[cfg(debug_assertions)]
         if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
             panic!("{}", error);
@@ -67,14 +73,16 @@ impl<'ctx> Struct<'ctx> {
     }
 
     pub fn get_field_count(&self) -> usize {
-        unsafe {
-            let count = gccjit_sys::gcc_jit_struct_get_field_count(self.ptr) as usize;
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-                panic!("{}", error);
+        with_lib(|lib| {
+            unsafe {
+                let count = lib.gcc_jit_struct_get_field_count(self.ptr) as usize;
+                #[cfg(debug_assertions)]
+                if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
+                    panic!("{}", error);
+                }
+                count
             }
-            count
-        }
+        })
     }
 }
 

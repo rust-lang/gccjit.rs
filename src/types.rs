@@ -9,6 +9,8 @@ use structs::{self, Struct};
 
 use gccjit_sys::gcc_jit_types::*;
 
+use crate::with_lib;
+
 /// A representation of a type, as it is known to the JIT compiler.
 /// Types can be created through the Typeable trait or they can
 /// be created dynamically by composing Field types.
@@ -33,15 +35,19 @@ impl<'ctx> VectorType<'ctx> {
     }
 
     pub fn get_element_type(&self) -> Type<'ctx> {
-        unsafe {
-            from_ptr(gccjit_sys::gcc_jit_vector_type_get_element_type(self.ptr))
-        }
+        with_lib(|lib| {
+            unsafe {
+                from_ptr(lib.gcc_jit_vector_type_get_element_type(self.ptr))
+            }
+        })
     }
 
     pub fn get_num_units(&self) -> usize {
-        unsafe {
-            gccjit_sys::gcc_jit_vector_type_get_num_units(self.ptr) as usize
-        }
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_vector_type_get_num_units(self.ptr) as usize
+            }
+        })
     }
 }
 
@@ -70,31 +76,39 @@ impl<'ctx> FunctionPtrType<'ctx> {
     }
 
     pub fn get_return_type(&self) -> Type<'ctx> {
-        unsafe {
-            from_ptr(gccjit_sys::gcc_jit_function_type_get_return_type(self.ptr))
-        }
+        with_lib(|lib| {
+            unsafe {
+                from_ptr(lib.gcc_jit_function_type_get_return_type(self.ptr))
+            }
+        })
     }
 
     pub fn get_param_count(&self) -> usize {
-        unsafe {
-            gccjit_sys::gcc_jit_function_type_get_param_count(self.ptr) as usize
-        }
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_function_type_get_param_count(self.ptr) as usize
+            }
+        })
     }
 
     pub fn get_param_type(&self, index: usize) -> Type<'ctx> {
         // TODO: return Option?
-        unsafe {
-            from_ptr(gccjit_sys::gcc_jit_function_type_get_param_type(self.ptr, index as _))
-        }
+        with_lib(|lib| {
+            unsafe {
+                from_ptr(lib.gcc_jit_function_type_get_param_type(self.ptr, index as _))
+            }
+        })
     }
 }
 
 impl<'ctx> ToObject<'ctx> for Type<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        unsafe {
-            let ptr = gccjit_sys::gcc_jit_type_as_object(self.ptr);
-            object::from_ptr(ptr)
-        }
+        with_lib(|lib| {
+            unsafe {
+                let ptr = lib.gcc_jit_type_as_object(self.ptr);
+                object::from_ptr(ptr)
+            }
+        })
     }
 }
 
@@ -108,142 +122,178 @@ impl<'ctx> fmt::Debug for Type<'ctx> {
 impl<'ctx> Type<'ctx> {
     /// Given a type T, creates a type to *T, a pointer to T.
     pub fn make_pointer(self) -> Type<'ctx> {
-        unsafe {
-            from_ptr(gccjit_sys::gcc_jit_type_get_pointer(self.ptr))
-        }
+        with_lib(|lib| {
+            unsafe {
+                from_ptr(lib.gcc_jit_type_get_pointer(self.ptr))
+            }
+        })
     }
 
     #[cfg(feature="master")]
     pub fn set_packed(&self) {
-        unsafe {
-            gccjit_sys::gcc_jit_type_set_packed(self.ptr);
-        }
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_type_set_packed(self.ptr);
+            }
+        })
     }
 
     #[cfg(feature="master")]
     pub fn set_addressable(&self) {
-        unsafe {
-            gccjit_sys::gcc_jit_type_set_addressable(self.ptr);
-        }
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_type_set_addressable(self.ptr);
+            }
+        })
     }
 
     /// Given a type T, creates a type of const T.
     pub fn make_const(self) -> Type<'ctx> {
-        unsafe {
-            from_ptr(gccjit_sys::gcc_jit_type_get_const(self.ptr))
-        }
+        with_lib(|lib| {
+            unsafe {
+                from_ptr(lib.gcc_jit_type_get_const(self.ptr))
+            }
+        })
     }
 
     /// Given a type T, creates a new type of volatile T, which
     /// has the semantics of C's volatile.
     pub fn make_volatile(self) -> Type<'ctx> {
-        unsafe {
-            from_ptr(gccjit_sys::gcc_jit_type_get_volatile(self.ptr))
-        }
+        with_lib(|lib| {
+            unsafe {
+                from_ptr(lib.gcc_jit_type_get_volatile(self.ptr))
+            }
+        })
     }
 
     /// Given a type T, creates a new type of restrict T, which
     /// has the semantics of C's restrict.
     #[cfg(feature="master")]
     pub fn make_restrict(self) -> Type<'ctx> {
-        unsafe {
-            from_ptr(gccjit_sys::gcc_jit_type_get_restrict(self.ptr))
-        }
+        with_lib(|lib| {
+            unsafe {
+                from_ptr(lib.gcc_jit_type_get_restrict(self.ptr))
+            }
+        })
     }
 
     pub fn get_aligned(self, alignment_in_bytes: u64) -> Type<'ctx> {
-        unsafe {
-            from_ptr(gccjit_sys::gcc_jit_type_get_aligned(self.ptr, alignment_in_bytes as _))
-        }
+        with_lib(|lib| {
+            unsafe {
+                from_ptr(lib.gcc_jit_type_get_aligned(self.ptr, alignment_in_bytes as _))
+            }
+        })
     }
 
     pub fn dyncast_array(self) -> Option<Type<'ctx>> {
-        unsafe {
-            let array_type = gccjit_sys::gcc_jit_type_dyncast_array(self.ptr);
-            if array_type.is_null() {
-                return None;
+        with_lib(|lib| {
+            unsafe {
+                let array_type = lib.gcc_jit_type_dyncast_array(self.ptr);
+                if array_type.is_null() {
+                    return None;
+                }
+                Some(from_ptr(array_type))
             }
-            Some(from_ptr(array_type))
-        }
+        })
     }
 
     pub fn is_bool(self) -> bool {
-        unsafe {
-            gccjit_sys::gcc_jit_type_is_bool(self.ptr) != 0
-        }
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_type_is_bool(self.ptr) != 0
+            }
+        })
     }
 
     pub fn is_integral(self) -> bool {
-        unsafe {
-            gccjit_sys::gcc_jit_type_is_integral(self.ptr) != 0
-        }
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_type_is_integral(self.ptr) != 0
+            }
+        })
     }
 
     #[cfg(feature = "master")]
     pub fn is_floating_point(self) -> bool {
-        unsafe {
-            gccjit_sys::gcc_jit_type_is_floating_point(self.ptr) != 0
-        }
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_type_is_floating_point(self.ptr) != 0
+            }
+        })
     }
 
     pub fn dyncast_vector(self) -> Option<VectorType<'ctx>> {
-        unsafe {
-            let vector_type = gccjit_sys::gcc_jit_type_dyncast_vector(self.ptr);
-            if vector_type.is_null() {
-                return None;
+        with_lib(|lib| {
+            unsafe {
+                let vector_type = lib.gcc_jit_type_dyncast_vector(self.ptr);
+                if vector_type.is_null() {
+                    return None;
+                }
+                Some(VectorType::from_ptr(vector_type))
             }
-            Some(VectorType::from_ptr(vector_type))
-        }
+        })
     }
 
     pub fn is_struct(self) -> Option<Struct<'ctx>> {
-        unsafe {
-            let struct_type = gccjit_sys::gcc_jit_type_is_struct(self.ptr);
-            if struct_type.is_null() {
-                return None;
+        with_lib(|lib| {
+            unsafe {
+                let struct_type = lib.gcc_jit_type_is_struct(self.ptr);
+                if struct_type.is_null() {
+                    return None;
+                }
+                Some(structs::from_ptr(struct_type))
             }
-            Some(structs::from_ptr(struct_type))
-        }
+        })
     }
 
     pub fn dyncast_function_ptr_type(self) -> Option<FunctionPtrType<'ctx>> {
-        unsafe {
-            let function_ptr_type = gccjit_sys::gcc_jit_type_dyncast_function_ptr_type(self.ptr);
-            if function_ptr_type.is_null() {
-                return None;
+        with_lib(|lib| {
+            unsafe {
+                let function_ptr_type = lib.gcc_jit_type_dyncast_function_ptr_type(self.ptr);
+                if function_ptr_type.is_null() {
+                    return None;
+                }
+                Some(FunctionPtrType::from_ptr(function_ptr_type))
             }
-            Some(FunctionPtrType::from_ptr(function_ptr_type))
-        }
+        })
     }
 
     pub fn get_size(&self) -> u32 {
-        unsafe {
-            let size = gccjit_sys::gcc_jit_type_get_size(self.ptr);
-            assert_ne!(size, -1, "called get_size of unsupported type: {self:?}");
-            size as u32
-        }
+        with_lib(|lib| {
+            unsafe {
+                let size = lib.gcc_jit_type_get_size(self.ptr);
+                assert_ne!(size, -1, "called get_size of unsupported type: {self:?}");
+                size as u32
+            }
+        })
     }
 
     pub fn unqualified(&self) -> Type<'ctx> {
-        unsafe {
-            from_ptr(gccjit_sys::gcc_jit_type_unqualified(self.ptr))
-        }
+        with_lib(|lib| {
+            unsafe {
+                from_ptr(lib.gcc_jit_type_unqualified(self.ptr))
+            }
+        })
     }
 
     pub fn get_pointee(&self) -> Option<Type<'ctx>> {
-        unsafe {
-            let value = gccjit_sys::gcc_jit_type_is_pointer(self.ptr);
-            if value.is_null() {
-                return None;
+        with_lib(|lib| {
+            unsafe {
+                let value = lib.gcc_jit_type_is_pointer(self.ptr);
+                if value.is_null() {
+                    return None;
+                }
+                Some(from_ptr(value))
             }
-            Some(from_ptr(value))
-        }
+        })
     }
 
     pub fn is_compatible_with(&self, typ: Type<'ctx>) -> bool {
-        unsafe {
-            gccjit_sys::gcc_jit_compatible_types(self.ptr, typ.ptr)
-        }
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_compatible_types(self.ptr, typ.ptr)
+            }
+        })
     }
 }
 
@@ -259,15 +309,17 @@ macro_rules! typeable_def {
     ($ty:ty, $expr:expr) => {
         impl Typeable for $ty {
             fn get_type<'a, 'ctx>(ctx: &'a Context<'ctx>) -> Type<'a> {
-                unsafe {
-                    let ctx_ptr = context::get_ptr(ctx);
-                    let ptr = gccjit_sys::gcc_jit_context_get_type(ctx_ptr, $expr);
-                    #[cfg(debug_assertions)]
-                    if let Ok(Some(error)) = ctx.get_last_error() {
-                        panic!("{}", error);
+                with_lib(|lib| {
+                    unsafe {
+                        let ctx_ptr = context::get_ptr(ctx);
+                        let ptr = lib.gcc_jit_context_get_type(ctx_ptr, $expr);
+                        #[cfg(debug_assertions)]
+                        if let Ok(Some(error)) = ctx.get_last_error() {
+                            panic!("{}", error);
+                        }
+                        from_ptr(ptr)
                     }
-                    from_ptr(ptr)
-                }
+                })
             }
         }
     }
@@ -284,11 +336,13 @@ macro_rules! typeable_int_def {
     ($ty:ty, $num_bytes:expr, $signed:expr) => {
         impl Typeable for $ty {
             fn get_type<'a, 'ctx>(ctx: &'a Context<'ctx>) -> Type<'a> {
-                unsafe {
-                    let ctx_ptr = context::get_ptr(ctx);
-                    let ptr = gccjit_sys::gcc_jit_context_get_int_type(ctx_ptr, $num_bytes, $signed as i32);
-                    from_ptr(ptr)
-                }
+                with_lib(|lib| {
+                    unsafe {
+                        let ctx_ptr = context::get_ptr(ctx);
+                        let ptr = lib.gcc_jit_context_get_int_type(ctx_ptr, $num_bytes, $signed as i32);
+                        from_ptr(ptr)
+                    }
+                })
             }
         }
     }
@@ -312,29 +366,33 @@ typeable_int_def!(u64, 8, false);
 /// function should be used.
 impl<T> Typeable for *mut T {
     fn get_type<'a, 'ctx>(ctx: &'a Context<'ctx>) -> Type<'a> {
-        unsafe {
-            let ctx_ptr = context::get_ptr(ctx);
-            let ptr = gccjit_sys::gcc_jit_context_get_type(ctx_ptr, GCC_JIT_TYPE_VOID_PTR);
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = ctx.get_last_error() {
-                panic!("{}", error);
+        with_lib(|lib| {
+            unsafe {
+                let ctx_ptr = context::get_ptr(ctx);
+                let ptr = lib.gcc_jit_context_get_type(ctx_ptr, GCC_JIT_TYPE_VOID_PTR);
+                #[cfg(debug_assertions)]
+                if let Ok(Some(error)) = ctx.get_last_error() {
+                    panic!("{}", error);
+                }
+                from_ptr(ptr)
             }
-            from_ptr(ptr)
-        }
+        })
     }
 }
 
 impl<T> Typeable for *const T {
     fn get_type<'a, 'ctx>(ctx: &'a Context<'ctx>) -> Type<'a> {
-        unsafe {
-            let ctx_ptr = context::get_ptr(ctx);
-            let ptr = gccjit_sys::gcc_jit_context_get_type(ctx_ptr, GCC_JIT_TYPE_VOID_PTR);
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = ctx.get_last_error() {
-                panic!("{}", error);
+        with_lib(|lib| {
+            unsafe {
+                let ctx_ptr = context::get_ptr(ctx);
+                let ptr = lib.gcc_jit_context_get_type(ctx_ptr, GCC_JIT_TYPE_VOID_PTR);
+                #[cfg(debug_assertions)]
+                if let Ok(Some(error)) = ctx.get_last_error() {
+                    panic!("{}", error);
+                }
+                from_ptr(ptr).make_const()
             }
-            from_ptr(ptr).make_const()
-        }
+        })
     }
 }
 
