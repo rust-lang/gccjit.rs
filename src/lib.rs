@@ -126,11 +126,20 @@ fn with_lib<T, F: Fn(&Libgccjit) -> T>(callback: F) -> T {
     })
 }
 
+/// Returns true if the library was loaded correctly, false otherwise.
 #[cfg(feature="dlopen")]
-pub fn load(path: &CStr) {
+pub fn load(path: &CStr) -> bool {
     LIB.with(|lib| {
         *lib.borrow_mut() = unsafe { Libgccjit::open(path) };
-    });
+        lib.borrow().is_some()
+    })
+}
+
+#[cfg(feature="dlopen")]
+pub fn is_loaded() -> bool {
+    LIB.with(|lib| {
+        lib.borrow().is_some()
+    })
 }
 
 #[cfg(feature="dlopen")]
