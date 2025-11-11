@@ -15,6 +15,9 @@ mod platform {
 
     pub struct Library(*mut c_void);
 
+    unsafe impl Send for Library {}
+    unsafe impl Sync for Library {}
+
     impl Library {
         pub unsafe fn open(path: &CStr) -> Option<Self> {
             const RTLD_NOW: c_int = 2;
@@ -58,6 +61,9 @@ mod platform {
     }
 
     pub struct Library(*mut c_void);
+
+    unsafe impl Send for Library {}
+    unsafe impl Sync for Library {}
 
     impl Library {
         pub unsafe fn open(path: &CStr) -> Option<Self> {

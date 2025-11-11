@@ -34,9 +34,9 @@ mod block;
 mod target_info;
 
 #[cfg(feature="dlopen")]
-use std::cell::RefCell;
-#[cfg(feature="dlopen")]
 use std::ffi::CStr;
+#[cfg(feature="dlopen")]
+use std::sync::OnceLock;
 
 pub use context::Context;
 pub use context::CType;
@@ -113,41 +113,31 @@ fn with_lib<T, F: Fn(&Libgccjit) -> T>(callback: F) -> T {
 
 #[cfg(feature="dlopen")]
 fn with_lib<T, F: Fn(&Libgccjit) -> T>(callback: F) -> T {
-    LIB.with(|lib| {
-        #[cfg(not(feature="dlopen"))]
-        if lib.borrow().is_none() {
-            *lib.borrow_mut() = unsafe { Libgccjit::open() };
-        }
-
-        match *lib.borrow() {
-            Some(ref lib) => callback(lib),
-            None => panic!("libgccjit needs to be loaded by calling load() before attempting to do any operation"),
-        }
-    })
+    let lib = LIB.get().and_then(|lib| lib.as_ref());
+    match lib {
+        Some(lib) => callback(lib),
+        None => panic!("libgccjit needs to be loaded by calling load() before attempting to do any operation"),
+    }
 }
 
 /// Returns true if the library was loaded correctly, false otherwise.
 #[cfg(feature="dlopen")]
 pub fn load(path: &CStr) -> bool {
-    LIB.with(|lib| {
-        *lib.borrow_mut() = unsafe { Libgccjit::open(path) };
-        lib.borrow().is_some()
-    })
+    let lib =
+        LIB.get_or_init(|| {
+            unsafe { Libgccjit::open(path) }
+        });
+    lib.is_some()
 }
 
 #[cfg(feature="dlopen")]
 pub fn is_loaded() -> bool {
-    LIB.with(|lib| {
-        lib.borrow().is_some()
-    })
+    LIB.get().is_some()
 }
 
 #[cfg(feature="dlopen")]
-thread_local! {
-    pub static LIB: RefCell<Option<Libgccjit>> = const { RefCell::new(None) };
-}
+pub static LIB: OnceLock<Option<Libgccjit>> = OnceLock::new();
 
-// Without the dlopen feature, we avoid using thread_local and RefCell as to not have any
-// performance impact.
+// Without the dlopen feature, we avoid using OnceLock as to not have any performance impact.
 #[cfg(not(feature="dlopen"))]
 static LIB: Libgccjit = Libgccjit::new();
