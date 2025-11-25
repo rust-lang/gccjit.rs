@@ -740,7 +740,7 @@ impl<'ctx> Context<'ctx> {
                 .collect();
             unsafe {
                 let ptr = lib.gcc_jit_context_new_call(self.ptr, loc_ptr, function::get_ptr(&func), num_params,
-                params_ptrs.as_mut_ptr());
+                    params_ptrs.as_mut_ptr());
                 #[cfg(debug_assertions)]
                 if let Ok(Some(error)) = self.get_last_error() {
                     panic!("{}", error);
@@ -815,7 +815,7 @@ impl<'ctx> Context<'ctx> {
         with_lib(|lib| {
             unsafe {
                 let ptr = lib.gcc_jit_context_new_bitcast(self.ptr, loc_ptr, rvalue::get_ptr(&rvalue),
-                types::get_ptr(&dest_type));
+                    types::get_ptr(&dest_type));
                 #[cfg(debug_assertions)]
                 if let Ok(Some(error)) = self.get_last_error() {
                     panic!("{}", error);
@@ -840,7 +840,7 @@ impl<'ctx> Context<'ctx> {
         with_lib(|lib| {
             unsafe {
                 let ptr = lib.gcc_jit_context_new_array_access(self.ptr, loc_ptr, rvalue::get_ptr(&array_rvalue),
-                rvalue::get_ptr(&idx_rvalue));
+                    rvalue::get_ptr(&idx_rvalue));
                 #[cfg(debug_assertions)]
                 if let Ok(Some(error)) = self.get_last_error() {
                     panic!("{}", error);
@@ -874,7 +874,7 @@ impl<'ctx> Context<'ctx> {
                     None => ptr::null_mut()
                 };
                 let ptr = lib.gcc_jit_context_new_rvalue_from_vector(self.ptr, loc_ptr, types::get_ptr(&vec_type),
-                elements.len() as _, elements.as_ptr() as *mut *mut _);
+                    elements.len() as _, elements.as_ptr() as *mut *mut _);
                 #[cfg(debug_assertions)]
                 if let Ok(Some(error)) = self.get_last_error() {
                     panic!("{}", error);
@@ -893,7 +893,7 @@ impl<'ctx> Context<'ctx> {
                     None => ptr::null_mut()
                 };
                 let ptr = lib.gcc_jit_context_new_rvalue_vector_perm(self.ptr, loc_ptr, rvalue::get_ptr(&elements1),
-                rvalue::get_ptr(&elements2), rvalue::get_ptr(&mask));
+                    rvalue::get_ptr(&elements2), rvalue::get_ptr(&mask));
                 #[cfg(debug_assertions)]
                 if let Ok(Some(error)) = self.get_last_error() {
                     panic!("{}", error);
@@ -919,7 +919,7 @@ impl<'ctx> Context<'ctx> {
                     };
 
                 let ptr = lib.gcc_jit_context_new_struct_constructor(self.ptr, loc_ptr, types::get_ptr(&struct_type),
-                values.len() as _, fields_ptr as *mut *mut _, values.as_ptr() as *mut *mut _);
+                    values.len() as _, fields_ptr as *mut *mut _, values.as_ptr() as *mut *mut _);
                 #[cfg(debug_assertions)]
                 if let Ok(Some(error)) = self.get_last_error() {
                     panic!("{}", error);
@@ -937,7 +937,7 @@ impl<'ctx> Context<'ctx> {
                     None => ptr::null_mut()
                 };
                 let ptr = lib.gcc_jit_context_new_array_constructor(self.ptr, loc_ptr, types::get_ptr(&array_type),
-                elements.len() as _, elements.as_ptr() as *mut *mut _);
+                    elements.len() as _, elements.as_ptr() as *mut *mut _);
                 #[cfg(debug_assertions)]
                 if let Ok(Some(error)) = self.get_last_error() {
                     panic!("{}", error);
