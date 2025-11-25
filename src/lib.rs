@@ -33,6 +33,11 @@ mod block;
 #[cfg(feature="master")]
 mod target_info;
 
+#[cfg(feature="dlopen")]
+use std::ffi::CStr;
+#[cfg(feature="dlopen")]
+use std::sync::OnceLock;
+
 pub use context::Context;
 pub use context::CType;
 pub use context::GlobalKind;
@@ -59,12 +64,16 @@ pub use block::{Block, BinaryOp, UnaryOp, ComparisonOp};
 #[cfg(feature="master")]
 pub use target_info::TargetInfo;
 
+use gccjit_sys::Libgccjit;
+
 #[cfg(feature="master")]
 pub fn set_global_personality_function_name(name: &'static [u8]) {
     debug_assert!(name.ends_with(b"\0"), "Expecting a NUL-terminated C string");
-    unsafe {
-        gccjit_sys::gcc_jit_set_global_personality_function_name(name.as_ptr() as *const _);
-    }
+    with_lib(|lib| {
+        unsafe {
+            lib.gcc_jit_set_global_personality_function_name(name.as_ptr() as *const _);
+        }
+    })
 }
 
 #[derive(Debug)]
@@ -76,19 +85,59 @@ pub struct Version {
 
 impl Version {
     pub fn get() -> Self {
-        unsafe {
-            Self {
-                major: gccjit_sys::gcc_jit_version_major(),
-                minor: gccjit_sys::gcc_jit_version_minor(),
-                patch: gccjit_sys::gcc_jit_version_patchlevel(),
+        with_lib(|lib| {
+            unsafe {
+                Self {
+                    major: lib.gcc_jit_version_major(),
+                    minor: lib.gcc_jit_version_minor(),
+                    patch: lib.gcc_jit_version_patchlevel(),
+                }
             }
-        }
+        })
     }
 }
 
 #[cfg(feature="master")]
 pub fn is_lto_supported() -> bool {
-    unsafe {
-        gccjit_sys::gcc_jit_is_lto_supported()
+    with_lib(|lib| {
+        unsafe {
+            lib.gcc_jit_is_lto_supported()
+        }
+    })
+}
+
+#[cfg(not(feature="dlopen"))]
+fn with_lib<T, F: Fn(&Libgccjit) -> T>(callback: F) -> T {
+    callback(&LIB)
+}
+
+#[cfg(feature="dlopen")]
+fn with_lib<T, F: Fn(&Libgccjit) -> T>(callback: F) -> T {
+    let lib = LIB.get().and_then(|lib| lib.as_ref());
+    match lib {
+        Some(lib) => callback(lib),
+        None => panic!("libgccjit needs to be loaded by calling load() before attempting to do any operation"),
     }
 }
+
+/// Returns true if the library was loaded correctly, false otherwise.
+#[cfg(feature="dlopen")]
+pub fn load(path: &CStr) -> bool {
+    let lib =
+        LIB.get_or_init(|| {
+            unsafe { Libgccjit::open(path) }
+        });
+    lib.is_some()
+}
+
+#[cfg(feature="dlopen")]
+pub fn is_loaded() -> bool {
+    LIB.get().is_some()
+}
+
+#[cfg(feature="dlopen")]
+pub static LIB: OnceLock<Option<Libgccjit>> = OnceLock::new();
+
+// Without the dlopen feature, we avoid using OnceLock as to not have any performance impact.
+#[cfg(not(feature="dlopen"))]
+static LIB: Libgccjit = Libgccjit::new();

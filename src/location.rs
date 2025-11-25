@@ -4,6 +4,8 @@ use context::Context;
 use object;
 use object::{Object, ToObject};
 
+use crate::with_lib;
+
 /// A Location represents a location used when debugging jitted code.
 #[derive(Copy, Clone)]
 pub struct Location<'ctx> {
@@ -13,9 +15,11 @@ pub struct Location<'ctx> {
 
 impl<'ctx> ToObject<'ctx> for Location<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        unsafe {
-            object::from_ptr(gccjit_sys::gcc_jit_location_as_object(self.ptr))
-        }
+        with_lib(|lib| {
+            unsafe {
+                object::from_ptr(lib.gcc_jit_location_as_object(self.ptr))
+            }
+        })
     }
 }
 

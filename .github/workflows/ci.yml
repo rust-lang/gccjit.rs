@@ -53,7 +53,7 @@ jobs:
       - name: Build
         run: |
           cargo build
-          cargo build --features master
+          cargo build --features master,dlopen
           cargo build --examples
 
       - name: Test
@@ -64,4 +64,4 @@ jobs:
       - name: clippy
         run: |
           cargo clippy --all-targets -- -D warnings
-          cargo clippy --all-targets --features master -- -D warnings
+          cargo clippy --all-targets --features master,dlopen -- -D warnings
