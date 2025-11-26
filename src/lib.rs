@@ -122,12 +122,19 @@ fn with_lib<T, F: Fn(&Libgccjit) -> T>(callback: F) -> T {
 
 /// Returns true if the library was loaded correctly, false otherwise.
 #[cfg(feature="dlopen")]
-pub fn load(path: &CStr) -> bool {
-    let lib =
-        LIB.get_or_init(|| {
-            unsafe { Libgccjit::open(path) }
-        });
-    lib.is_some()
+pub fn load(path: &CStr) -> Result<(), String> {
+    let mut result = Ok(());
+    LIB.get_or_init(|| {
+        let lib = unsafe { Libgccjit::open(path) };
+        match lib {
+            Ok(lib) => Some(lib),
+            Err(error) => {
+                result = Err(error);
+                None
+            },
+        }
+    });
+    result
 }
 
 #[cfg(feature="dlopen")]

@@ -338,15 +338,15 @@ macro_rules! extern_maybe_dlopen {
             }
 
             #[cfg(feature="dlopen")]
-            pub unsafe fn open(path: &CStr) -> Option<Self> {
+            pub unsafe fn open(path: &CStr) -> Result<Self, String> {
                 let lib = unsafe { dynload::Library::open(path)? };
 
-                Some(Self {
+                Ok(Self {
                     $(
                     $(#[cfg($attr_name=$attr_value)])?
                     $func_name: unsafe { std::mem::transmute::<*mut (), unsafe extern "C" fn($($arg_type),*) $(-> $return_type)?>(
-                        lib.get(CStr::from_bytes_with_nul_unchecked(concat!(stringify!($func_name), "\0").as_bytes())
-                    )?) },
+                        lib.get(CStr::from_bytes_with_nul_unchecked(concat!(stringify!($func_name), "\0").as_bytes()))?
+                    )},
                     )*
                     _lib: lib,
                 })
