@@ -92,7 +92,7 @@ mod platform {
         pub unsafe fn get(&self, sym: &CStr) -> Result<*mut (), String> {
             let ptr = GetProcAddress(self.0, sym.as_ptr() as *const _);
             if ptr.is_null() {
-                Some("cannot load symbol".to_string())
+                Err("cannot load symbol".to_string())
             }
             else {
                 Ok(ptr.cast())
