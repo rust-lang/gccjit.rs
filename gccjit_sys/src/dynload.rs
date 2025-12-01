@@ -4,15 +4,8 @@ pub use self::platform::Library;
 
 #[cfg(unix)]
 mod platform {
-    use std::ffi::{CStr, c_char, c_int, c_void};
-
-    #[link(name="dl")]
-    extern "C" {
-        fn dlopen(filename: *const i8, flag: c_int) -> *mut c_void;
-        fn dlsym(handle: *mut c_void, symbol: *const i8) -> *mut c_void;
-        fn dlclose(handle: *mut c_void) -> c_int;
-        fn dlerror() -> *const c_char;
-    }
+    use std::ffi::{CStr, c_void};
+    use libc::{c_char,  RTLD_NOW};
 
     pub struct Library(*mut c_void);
 
@@ -21,8 +14,8 @@ mod platform {
 
     impl Library {
         pub unsafe fn open(path: &CStr) -> Result<Self, String> {
-            const RTLD_NOW: c_int = 2;
-            let handle = dlopen(path.as_ptr(), RTLD_NOW);
+            use libc::dlopen;
+            let handle = dlopen(path.as_ptr() as *const c_char, RTLD_NOW);
             if handle.is_null() {
                 Self::error()
             }
@@ -32,7 +25,8 @@ mod platform {
         }
 
         pub unsafe fn get(&self, sym: &CStr) -> Result<*mut (), String> {
-            let ptr = dlsym(self.0, sym.as_ptr());
+            use libc::dlsym;
+            let ptr = dlsym(self.0, sym.as_ptr() as *const c_char);
             if ptr.is_null() {
                 Self::error()
             }
@@ -42,6 +36,7 @@ mod platform {
         }
 
         unsafe fn error<T>() -> Result<T, String> {
+            use libc::dlerror;
             let cstr = dlerror();
             let cstr = CStr::from_ptr(cstr);
             let string = cstr.to_str()
@@ -53,7 +48,9 @@ mod platform {
 
     impl Drop for Library {
         fn drop(&mut self) {
-            unsafe { dlclose(self.0); }
+            unsafe {
+                libc::dlclose(self.0);
+            }
         }
     }
 }
@@ -62,11 +59,12 @@ mod platform {
 mod platform {
     use std::ffi::{CStr, OsString, c_void};
     use std::os::windows::ffi::OsStrExt;
+    use libc::c_char;
 
     #[link(name="kernel32")]
     extern "system" {
         fn LoadLibraryW(lpLibFileName: *const u16) -> *mut c_void;
-        fn GetProcAddress(hModule: *mut c_void, lpProcName: *const u8) -> *mut c_void;
+        fn GetProcAddress(hModule: *mut c_void, lpProcName: *const c_char) -> *mut c_void;
         fn FreeLibrary(hLibModule: *mut c_void);
     }
 
@@ -90,7 +88,7 @@ mod platform {
         }
 
         pub unsafe fn get(&self, sym: &CStr) -> Result<*mut (), String> {
-            let ptr = GetProcAddress(self.0, sym.as_ptr() as *const _);
+            let ptr = GetProcAddress(self.0, sym.as_ptr() as *const c_char);
             if ptr.is_null() {
                 Err("cannot load symbol".to_string())
             }
