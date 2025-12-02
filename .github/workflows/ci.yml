@@ -81,3 +81,7 @@ jobs:
         run: |
           cargo clippy --all-targets -- -D warnings
           cargo clippy --all-targets --features master,dlopen -- -D warnings
+
+          cd gccjit_sys
+          cargo clippy --all-targets -- -D warnings
+          cargo clippy --all-targets --features master,dlopen -- -D warnings
