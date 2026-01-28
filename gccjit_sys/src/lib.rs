@@ -774,4 +774,10 @@ extern_maybe_dlopen! {
 
     #[cfg(feature="master")]
     fn gcc_jit_type_set_addressable(typ: *mut gcc_jit_type);
+
+    #[cfg(feature="master")]
+    fn gcc_jit_set_lang_name(lang_name: *const c_char);
+
+    #[cfg(feature="master")]
+    fn gcc_jit_context_set_filename(ctx: *mut gcc_jit_context, filename: *const c_char);
 }

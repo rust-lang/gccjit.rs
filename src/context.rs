@@ -1271,6 +1271,16 @@ impl<'ctx> Context<'ctx> {
             panic!("{}", error);
         }
     }
+
+    #[cfg(feature="master")]
+    pub fn set_filename(&self, filename: &str) {
+        let c_str = CString::new(filename).unwrap();
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_context_set_filename(self.ptr, c_str.as_ptr());
+            }
+        })
+    }
 }
 
 impl<'ctx> Drop for Context<'ctx> {
