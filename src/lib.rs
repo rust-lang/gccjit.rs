@@ -33,7 +33,7 @@ mod block;
 #[cfg(feature="master")]
 mod target_info;
 
-#[cfg(feature="dlopen")]
+#[cfg(any(feature="dlopen", feature="master"))]
 use std::ffi::CStr;
 #[cfg(feature="dlopen")]
 use std::sync::OnceLock;
@@ -148,3 +148,12 @@ pub static LIB: OnceLock<Option<Libgccjit>> = OnceLock::new();
 // Without the dlopen feature, we avoid using OnceLock as to not have any performance impact.
 #[cfg(not(feature="dlopen"))]
 static LIB: Libgccjit = Libgccjit::new();
+
+#[cfg(feature="master")]
+pub fn set_lang_name(lang_name: &'static CStr) {
+    unsafe {
+        with_lib(|lib| {
+            lib.gcc_jit_set_lang_name(lang_name.as_ptr());
+        });
+    }
+}
