@@ -780,4 +780,10 @@ extern_maybe_dlopen! {
 
     #[cfg(feature="master")]
     fn gcc_jit_context_set_filename(ctx: *mut gcc_jit_context, filename: *const c_char);
+
+    #[cfg(feature="master")]
+    fn gcc_jit_context_new_array_type_u64(ctx: *mut gcc_jit_context,
+                                          loc: *mut gcc_jit_location,
+                                          ty: *mut gcc_jit_type,
+                                          num_elements: u64) -> *mut gcc_jit_type;
 }
