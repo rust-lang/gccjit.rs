@@ -478,6 +478,29 @@ impl<'ctx> Context<'ctx> {
         })
     }
 
+    /// Constructs a new array type with a given base element type and a
+    /// size.
+    #[cfg(feature="master")]
+    pub fn new_array_type_u64<'a>(&'a self,
+                              loc: Option<Location<'a>>,
+                              ty: types::Type<'a>,
+                              num_elements: u64) -> types::Type<'a> {
+        let loc_ptr = match loc {
+            Some(loc) => unsafe { location::get_ptr(&loc) },
+            None => ptr::null_mut()
+        };
+        with_lib(|lib| {
+            unsafe {
+                let ptr = lib.gcc_jit_context_new_array_type_u64(self.ptr, loc_ptr, types::get_ptr(&ty), num_elements);
+                #[cfg(debug_assertions)]
+                if let Ok(Some(error)) = self.get_last_error() {
+                    panic!("{}", error);
+                }
+                types::from_ptr(ptr)
+            }
+        })
+    }
+
     pub fn new_vector_type<'a>(&'a self, ty: types::Type<'a>, num_units: u64) -> types::Type<'a> {
         with_lib(|lib| {
             unsafe {
