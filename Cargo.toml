@@ -18,3 +18,4 @@ gccjit_sys = { version = "1.3.0", path = "gccjit_sys" }
 
 [package.metadata.docs.rs]
 features = ["master"]
+rustdoc-args = ["--generate-link-to-definition"]
