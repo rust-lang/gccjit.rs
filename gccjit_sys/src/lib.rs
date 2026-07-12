@@ -666,6 +666,8 @@ extern_maybe_dlopen! {
 
     fn gcc_jit_context_new_bitcast(ctxt: *mut gcc_jit_context, loc: *mut gcc_jit_location, rvalue: *mut gcc_jit_rvalue, type_: *mut gcc_jit_type) -> *mut gcc_jit_rvalue;
 
+    fn gcc_jit_context_new_va_arg(ctxt: *mut gcc_jit_context, loc: *mut gcc_jit_location, ap: *mut gcc_jit_rvalue, type_: *mut gcc_jit_type) -> *mut gcc_jit_rvalue;
+
     fn gcc_jit_lvalue_set_register_name(lvalue: *mut gcc_jit_lvalue, reg_name: *const c_char);
 
     fn gcc_jit_context_new_struct_constructor(ctxt: *mut gcc_jit_context, loc: *mut gcc_jit_location, typ: *mut gcc_jit_type, num_values: c_int, fields: *mut *mut gcc_jit_field, values: *mut *mut gcc_jit_rvalue) -> *mut gcc_jit_rvalue;

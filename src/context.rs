@@ -848,6 +848,30 @@ impl<'ctx> Context<'ctx> {
         })
     }
 
+    /// Read the next argument of a C-variadic function.
+    ///
+    /// Equivalent to the C `va_arg(*ap, arg_type)`.
+    pub fn new_va_arg<'a, T: ToRValue<'a>>(&'a self,
+                                           loc: Option<Location<'a>>,
+                                           ap: T,
+                                           arg_type: types::Type<'a>) -> RValue<'a> {
+        let ap = ap.to_rvalue();
+        let loc_ptr = match loc {
+            Some(loc) => unsafe { location::get_ptr(&loc) },
+            None => ptr::null_mut()
+        };
+        with_lib(|lib| {
+            unsafe {
+                let ptr = lib.gcc_jit_context_new_va_arg(self.ptr, loc_ptr, rvalue::get_ptr(&ap), types::get_ptr(&arg_type));
+                #[cfg(debug_assertions)]
+                if let Ok(Some(error)) = self.get_last_error() {
+                    panic!("{}", error);
+                }
+                rvalue::from_ptr(ptr)
+            }
+        })
+    }
+
     /// Creates an LValue from an array pointer and an offset. The LValue can be the target
     /// of an assignment, or it can be converted into an RValue (i.e. loaded).
     pub fn new_array_access<'a, A: ToRValue<'a>, I: ToRValue<'a>>(&'a self,
