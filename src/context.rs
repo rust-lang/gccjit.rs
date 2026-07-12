@@ -1462,6 +1462,7 @@ pub enum CType {
     Float32,
     Float64,
     Float128,
+    VaList,
 }
 
 impl CType {
@@ -1499,6 +1500,7 @@ impl CType {
             Float32 => GCC_JIT_TYPE_FLOAT32,
             Float64 => GCC_JIT_TYPE_FLOAT64,
             Float128 => GCC_JIT_TYPE_FLOAT128,
+            VaList => GCC_JIT_TYPE_VA_LIST,
         }
     }
 }
