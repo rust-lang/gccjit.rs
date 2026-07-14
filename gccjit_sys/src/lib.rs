@@ -130,6 +130,7 @@ pub enum gcc_jit_types {
     GCC_JIT_TYPE_FLOAT32,
     GCC_JIT_TYPE_FLOAT64,
     GCC_JIT_TYPE_FLOAT128,
+    GCC_JIT_TYPE_VA_LIST,
 }
 
 #[repr(C)]
@@ -665,6 +666,8 @@ extern_maybe_dlopen! {
     fn gcc_jit_lvalue_set_link_section(lvalue: *mut gcc_jit_lvalue, name: *const c_char);
 
     fn gcc_jit_context_new_bitcast(ctxt: *mut gcc_jit_context, loc: *mut gcc_jit_location, rvalue: *mut gcc_jit_rvalue, type_: *mut gcc_jit_type) -> *mut gcc_jit_rvalue;
+
+    fn gcc_jit_context_new_va_arg(ctxt: *mut gcc_jit_context, loc: *mut gcc_jit_location, ap: *mut gcc_jit_rvalue, type_: *mut gcc_jit_type) -> *mut gcc_jit_rvalue;
 
     fn gcc_jit_lvalue_set_register_name(lvalue: *mut gcc_jit_lvalue, reg_name: *const c_char);
 
