@@ -629,6 +629,8 @@ extern_maybe_dlopen! {
                                          ret: *mut gcc_jit_rvalue);
     fn gcc_jit_block_end_with_void_return(block: *mut gcc_jit_block,
                                               loc: *mut gcc_jit_location);
+    fn gcc_jit_block_end_with_fallthrough(block: *mut gcc_jit_block,
+                                              loc: *mut gcc_jit_location);
     fn gcc_jit_context_new_child_context(parent: *mut gcc_jit_context) -> *mut gcc_jit_context;
     fn gcc_jit_context_dump_reproducer_to_file(parent: *mut gcc_jit_context,
                                                    path: *const c_char);

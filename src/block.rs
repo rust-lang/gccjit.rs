@@ -296,6 +296,30 @@ impl<'ctx> Block<'ctx> {
         }
     }
 
+    /// Terminates a block by falling through to the end of its enclosing
+    /// structured construct instead of by an explicit jump, return or
+    /// resume. This is intended for the exceptional (cleanup) body of a
+    /// try/finally created with `add_try_finally`: leaving that body by
+    /// fall-through lets the middle-end synthesize the context-sensitive
+    /// resume (RESX) rather than an unconditional cross-frame
+    /// `_Unwind_Resume`. A block terminated this way validates as
+    /// terminated and reports no successors.
+    pub fn end_with_fallthrough(&self, loc: Option<Location<'ctx>>) {
+        let loc_ptr = match loc {
+            Some(loc) => unsafe { location::get_ptr(&loc) },
+            None => ptr::null_mut()
+        };
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_block_end_with_fallthrough(self.ptr, loc_ptr);
+            }
+        });
+        #[cfg(debug_assertions)]
+        if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
+            panic!("{}", error);
+        }
+    }
+
     pub fn end_with_switch<T: ToRValue<'ctx>>(&self, loc: Option<Location<'ctx>>, expr: T, default_block: Block<'ctx>, cases: &[Case<'ctx>]) {
         let expr = expr.to_rvalue();
         let loc_ptr = match loc {
