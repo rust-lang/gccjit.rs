@@ -53,6 +53,7 @@ pub enum FnAttribute<'a> {
     AlwaysInline,
     Inline,
     NoInline,
+    NoIpa,
     Target(&'a str),
     Used,
     Visibility(Visibility),
@@ -95,6 +96,7 @@ impl<'a> FnAttribute<'a> {
             FnAttribute::AlwaysInline
             | FnAttribute::Inline
             | FnAttribute::NoInline
+            | FnAttribute::NoIpa
             | FnAttribute::Used
             | FnAttribute::Cold
             | FnAttribute::ReturnsTwice
@@ -132,6 +134,7 @@ impl<'a> FnAttribute<'a> {
             FnAttribute::AlwaysInline => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_ALWAYS_INLINE,
             FnAttribute::Inline => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_INLINE,
             FnAttribute::NoInline => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_NOINLINE,
+            FnAttribute::NoIpa => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_NOIPA,
             FnAttribute::Target(_) => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_TARGET,
             FnAttribute::Used => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_USED,
             FnAttribute::Visibility(_) => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_VISIBILITY,

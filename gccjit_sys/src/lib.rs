@@ -301,6 +301,8 @@ pub enum gcc_jit_fn_attribute
     GCC_JIT_FN_ATTRIBUTE_X86_THIS_CALL,
     GCC_JIT_FN_ATTRIBUTE_SECTION,
     GCC_JIT_FN_ATTRIBUTE_RETAIN,
+    // appended at end to match libgccjit.h (stable ABI values)
+    GCC_JIT_FN_ATTRIBUTE_NOIPA,
 }
 
 #[cfg(feature="master")]
