@@ -322,6 +322,23 @@ impl<'ctx> Block<'ctx> {
         }
     }
 
+    #[cfg(feature="master")]
+    pub fn end_with_fallthrough(&self, loc: Option<Location<'ctx>>) {
+        let loc_ptr = match loc {
+            Some(loc) => unsafe { location::get_ptr(&loc) },
+            None => ptr::null_mut()
+        };
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_block_end_with_fallthrough(self.ptr, loc_ptr);
+            }
+        });
+        #[cfg(debug_assertions)]
+        if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
+            panic!("{}", error);
+        }
+    }
+
     pub fn add_extended_asm(
         &self,
         loc: Option<Location<'ctx>>,

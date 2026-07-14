@@ -803,4 +803,8 @@ extern_maybe_dlopen! {
     fn gcc_jit_type_add_integer_attribute(ty: *mut gcc_jit_type,
                                           attribute: gcc_jit_type_attribute,
                                           value: c_int);
+
+    #[cfg(feature="master")]
+    fn gcc_jit_block_end_with_fallthrough(block: *mut gcc_jit_block,
+                                          loc: *mut gcc_jit_location);
 }
