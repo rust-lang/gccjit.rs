@@ -11,6 +11,7 @@ use context::{Case, Context};
 use object::{self, ToObject, Object};
 use function::{self, Function};
 use location::{self, Location};
+use region::{self, Region};
 use rvalue::{self, ToRValue};
 use lvalue::{self, ToLValue};
 
@@ -142,6 +143,30 @@ impl<'ctx> Block<'ctx> {
                 lib.gcc_jit_block_add_try_finally(self.ptr, loc_ptr, try_block.ptr, finally_block.ptr);
             }
         });
+    }
+
+    /// Adds a cleanup construct: the `cleanup_region` runs only on the
+    /// unwind path out of `try_region`, and then unwinding resumes (the
+    /// middle-end synthesizes the appropriate context-sensitive resume).
+    /// Both regions may span several blocks; a block in a region that
+    /// resumes unwinding (the cleanup's exit) is terminated with
+    /// `Block::end_with_fallthrough`.
+    #[cfg(feature="master")]
+    pub fn add_cleanup(&self, loc: Option<Location<'ctx>>, try_region: Region<'ctx>, cleanup_region: Region<'ctx>) {
+        let loc_ptr = match loc {
+                Some(loc) => unsafe { location::get_ptr(&loc) },
+                None => ptr::null_mut()
+            };
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_block_add_cleanup(self.ptr, loc_ptr,
+                    region::get_ptr(&try_region), region::get_ptr(&cleanup_region));
+            }
+        });
+        #[cfg(debug_assertions)]
+        if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
+            panic!("{}", error);
+        }
     }
 
     /// Assigns the value of an rvalue to an lvalue directly. Equivalent

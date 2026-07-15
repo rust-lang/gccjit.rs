@@ -30,6 +30,7 @@ mod rvalue;
 mod parameter;
 mod function;
 mod block;
+mod region;
 #[cfg(feature="master")]
 mod target_info;
 
@@ -63,6 +64,7 @@ pub use parameter::Parameter;
 pub use function::FnAttribute;
 pub use function::{Function, FunctionType};
 pub use block::{Block, BinaryOp, UnaryOp, ComparisonOp};
+pub use region::Region;
 #[cfg(feature="master")]
 pub use target_info::TargetInfo;
 
