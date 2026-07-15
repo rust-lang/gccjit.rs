@@ -12,6 +12,8 @@ use function::{self, Function};
 use location::{self, Location};
 use lvalue::{self, ToLValue};
 use object::{self, Object, ToObject};
+#[cfg(feature = "master")]
+use region::{self, Region};
 use rvalue::{self, ToRValue};
 
 use crate::with_lib;
@@ -140,6 +142,24 @@ impl<'ctx> Block<'ctx> {
         with_lib(|lib| unsafe {
             lib.gcc_jit_block_add_try_finally(self.ptr, loc_ptr, try_block.ptr, finally_block.ptr);
         });
+    }
+
+    #[cfg(feature="master")]
+    pub fn add_cleanup(&self, loc: Option<Location<'ctx>>, try_region: Region<'ctx>, cleanup_region: Region<'ctx>) {
+        let loc_ptr = match loc {
+                Some(loc) => unsafe { location::get_ptr(&loc) },
+                None => ptr::null_mut()
+            };
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_block_add_cleanup(self.ptr, loc_ptr,
+                    region::get_ptr(&try_region), region::get_ptr(&cleanup_region));
+            }
+        });
+        #[cfg(debug_assertions)]
+        if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
+            panic!("{}", error);
+        }
     }
 
     /// Assigns the value of an rvalue to an lvalue directly. Equivalent

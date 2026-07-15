@@ -20,6 +20,7 @@ pub enum gcc_jit_field {}
 pub enum gcc_jit_struct {}
 pub enum gcc_jit_function {}
 pub enum gcc_jit_block {}
+pub enum gcc_jit_region {}
 pub enum gcc_jit_rvalue {}
 pub enum gcc_jit_lvalue {}
 pub enum gcc_jit_param {}
@@ -807,4 +808,18 @@ extern_maybe_dlopen! {
     #[cfg(feature="master")]
     fn gcc_jit_block_end_with_fallthrough(block: *mut gcc_jit_block,
                                           loc: *mut gcc_jit_location);
+    #[cfg(feature="master")]
+    fn gcc_jit_block_add_cleanup(block: *mut gcc_jit_block,
+                                 loc: *mut gcc_jit_location,
+                                 try_region: *mut gcc_jit_region,
+                                 cleanup_region: *mut gcc_jit_region);
+    #[cfg(feature="master")]
+    fn gcc_jit_function_new_region(func: *mut gcc_jit_function,
+                                   loc: *mut gcc_jit_location) -> *mut gcc_jit_region;
+    #[cfg(feature="master")]
+    fn gcc_jit_region_new_block(region: *mut gcc_jit_region,
+                                name: *const c_char) -> *mut gcc_jit_block;
+    #[cfg(feature="master")]
+    fn gcc_jit_region_add_block(region: *mut gcc_jit_region,
+                                block: *mut gcc_jit_block);
 }

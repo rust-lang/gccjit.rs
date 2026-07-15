@@ -27,9 +27,11 @@ mod location;
 mod lvalue;
 mod object;
 mod parameter;
+#[cfg(feature = "master")]
+mod region;
 mod rvalue;
 mod structs;
-#[cfg(feature = "master")]
+#[cfg(feature="master")]
 mod target_info;
 mod types;
 
@@ -56,9 +58,11 @@ pub use lvalue::{VarAttribute, Visibility};
 pub use object::Object;
 pub use object::ToObject;
 pub use parameter::Parameter;
+#[cfg(feature = "master")]
+pub use region::Region;
 pub use rvalue::{RValue, ToRValue};
 pub use structs::Struct;
-#[cfg(feature = "master")]
+#[cfg(feature="master")]
 pub use target_info::TargetInfo;
 pub use types::FunctionPtrType;
 pub use types::Type;
