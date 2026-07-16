@@ -638,6 +638,9 @@ extern_maybe_dlopen! {
                                     name: *const c_char) -> *mut gcc_jit_block;
     fn gcc_jit_region_add_block(region: *mut gcc_jit_region,
                                     block: *mut gcc_jit_block);
+    fn gcc_jit_region_add_cloned_blocks(region: *mut gcc_jit_region,
+                                            num_blocks: c_int,
+                                            blocks: *mut *mut gcc_jit_block);
     fn gcc_jit_block_add_cleanup(block: *mut gcc_jit_block,
                                      loc: *mut gcc_jit_location,
                                      try_region: *mut gcc_jit_region,

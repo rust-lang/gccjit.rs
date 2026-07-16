@@ -51,6 +51,31 @@ impl<'ctx> Region<'ctx> {
             }
         })
     }
+
+    /// Clones the given blocks (and, transitively, any blocks they
+    /// structurally inline, such as a try/catch's try and handler blocks)
+    /// and adopts the clones as this region's body, in the given order (the
+    /// first is the region's entry). References among the cloned set are
+    /// remapped to the clones; references to blocks outside the set are
+    /// preserved. The originals are left untouched. This is the escape hatch
+    /// for a landing-pad-based frontend that must duplicate a shared cleanup
+    /// body per unwind edge.
+    pub fn add_cloned_blocks(&self, blocks: &[Block<'ctx>]) {
+        if blocks.is_empty() {
+            return;
+        }
+        with_lib(|lib| {
+            let mut ptrs: Vec<_> =
+                blocks.iter().map(|blk| unsafe { block::get_ptr(blk) }).collect();
+            unsafe {
+                lib.gcc_jit_region_add_cloned_blocks(
+                    self.ptr,
+                    ptrs.len() as _,
+                    ptrs.as_mut_ptr(),
+                );
+            }
+        })
+    }
 }
 
 pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_region) -> Region<'ctx> {
