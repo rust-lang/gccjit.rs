@@ -397,6 +397,29 @@ impl<'ctx> Block<'ctx> {
     }
 }
 
+/// Clones the given blocks (and, transitively, any blocks they structurally
+/// inline, such as a try/catch's try and handler blocks). Returns the clone of
+/// each input block, in the same order (so the first returned clone
+/// corresponds to the first input block). References among the cloned set are
+/// remapped to the clones; references to blocks outside the set are preserved.
+/// The originals are left untouched. The clones are loose blocks: they are not
+/// placed in any region, so the caller decides where they go (e.g. adopts them
+/// into a region with `Region::add_block`). All blocks must belong to the same
+/// function.
+pub fn clone_blocks<'ctx>(blocks: &[Block<'ctx>]) -> Vec<Block<'ctx>> {
+    if blocks.is_empty() {
+        return Vec::new();
+    }
+    with_lib(|lib| {
+        let mut src: Vec<_> = blocks.iter().map(|block| unsafe { get_ptr(block) }).collect();
+        let mut dst: Vec<*mut gccjit_sys::gcc_jit_block> = vec![ptr::null_mut(); blocks.len()];
+        unsafe {
+            lib.gcc_jit_blocks_clone(src.len() as c_int, src.as_mut_ptr(), dst.as_mut_ptr());
+            dst.into_iter().map(|ptr| from_ptr(ptr)).collect()
+        }
+    })
+}
+
 pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_block) -> Block<'ctx> {
     Block {
         marker: PhantomData,

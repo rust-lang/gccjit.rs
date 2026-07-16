@@ -63,7 +63,7 @@ pub use parameter::Parameter;
 #[cfg(feature="master")]
 pub use function::FnAttribute;
 pub use function::{Function, FunctionType};
-pub use block::{Block, BinaryOp, UnaryOp, ComparisonOp};
+pub use block::{clone_blocks, Block, BinaryOp, UnaryOp, ComparisonOp};
 pub use region::Region;
 #[cfg(feature="master")]
 pub use target_info::TargetInfo;
