@@ -506,6 +506,7 @@ extern_maybe_dlopen! {
     fn gcc_jit_lvalue_as_rvalue(lvalue: *mut gcc_jit_lvalue) -> *mut gcc_jit_rvalue;
     fn gcc_jit_rvalue_as_object(rvalue: *mut gcc_jit_rvalue) -> *mut gcc_jit_object;
     fn gcc_jit_rvalue_get_type(rvalue: *mut gcc_jit_rvalue) -> *mut gcc_jit_type;
+    fn gcc_jit_rvalue_set_bool_require_tail_call (call: *mut gcc_jit_rvalue, require_tail_call: c_int);
 
     fn gcc_jit_context_new_rvalue_from_int(ctx: *mut gcc_jit_context,
                                                ty: *mut gcc_jit_type,
