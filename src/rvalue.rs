@@ -190,6 +190,17 @@ impl<'ctx> RValue<'ctx> {
             }
         })
     }
+
+    pub fn set_require_tail_call(&self, require_tail_call: bool) {
+        with_lib(|lib| unsafe {
+            lib.gcc_jit_rvalue_set_bool_require_tail_call(self.ptr, require_tail_call as _);
+
+            #[cfg(debug_assertions)]
+            if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
+                panic!("{}", error);
+            }
+        })
+    }
 }
 
 pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_rvalue) -> RValue<'ctx> {
