@@ -407,6 +407,21 @@ impl<'ctx> Block<'ctx> {
     }
 }
 
+#[cfg(feature="master")]
+pub fn clone_blocks<'ctx>(blocks: &[Block<'ctx>]) -> Vec<Block<'ctx>> {
+    if blocks.is_empty() {
+        return Vec::new();
+    }
+    with_lib(|lib| {
+        let mut src: Vec<_> = blocks.iter().map(|block| unsafe { get_ptr(block) }).collect();
+        let mut dst: Vec<*mut gccjit_sys::gcc_jit_block> = vec![ptr::null_mut(); blocks.len()];
+        unsafe {
+            lib.gcc_jit_blocks_clone(src.len() as c_int, src.as_mut_ptr(), dst.as_mut_ptr());
+            dst.into_iter().map(|ptr| from_ptr(ptr)).collect()
+        }
+    })
+}
+
 pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_block) -> Block<'ctx> {
     Block {
         marker: PhantomData,

@@ -822,4 +822,8 @@ extern_maybe_dlopen! {
     #[cfg(feature="master")]
     fn gcc_jit_region_add_block(region: *mut gcc_jit_region,
                                 block: *mut gcc_jit_block);
+    #[cfg(feature="master")]
+    fn gcc_jit_blocks_clone(num_blocks: c_int,
+                            blocks: *mut *mut gcc_jit_block,
+                            out_clones: *mut *mut gcc_jit_block);
 }

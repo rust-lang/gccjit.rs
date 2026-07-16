@@ -40,6 +40,8 @@ use std::ffi::CStr;
 #[cfg(feature = "dlopen")]
 use std::sync::OnceLock;
 
+#[cfg(feature = "master")]
+pub use block::clone_blocks;
 pub use block::{BinaryOp, Block, ComparisonOp, UnaryOp};
 pub use context::CType;
 pub use context::CompileResult;
