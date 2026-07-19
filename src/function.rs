@@ -212,6 +212,18 @@ impl<'ctx> Function<'ctx> {
         })
     }
 
+    /// Make this function return its value in memory (through a hidden
+    /// pointer), even if the target ABI would normally return it in
+    /// registers.
+    #[cfg(feature="master")]
+    pub fn set_indirect_return(&self) {
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_function_set_indirect_return(self.ptr);
+            }
+        })
+    }
+
     pub fn get_address(&self, loc: Option<Location<'ctx>>) -> RValue<'ctx> {
         with_lib(|lib| {
             unsafe {
