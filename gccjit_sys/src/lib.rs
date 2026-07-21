@@ -307,6 +307,8 @@ pub enum gcc_jit_variable_attribute
 {
     GCC_JIT_VARIABLE_ATTRIBUTE_VISIBILITY,
     GCC_JIT_VARIABLE_ATTRIBUTE_WEAK,
+    GCC_JIT_VARIABLE_ATTRIBUTE_ALIAS,
+    GCC_JIT_VARIABLE_ATTRIBUTE_USED,
 }
 
 macro_rules! extern_maybe_dlopen {
