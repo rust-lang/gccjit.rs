@@ -48,6 +48,7 @@ pub enum AttributeValue<'a> {
 #[derive(Clone, Copy, Debug)]
 pub enum VarAttribute<'a> {
     Alias(&'a str),
+    Section(&'a str),
     Used,
     Visibility(Visibility),
     Weak,
@@ -58,6 +59,7 @@ impl<'a> VarAttribute<'a> {
     fn get_value(&self) -> AttributeValue<'_> {
         match *self {
             Self::Alias(alias) => AttributeValue::String(alias),
+            Self::Section(section) => AttributeValue::String(section),
             Self::Used => AttributeValue::None,
             Self::Visibility(visibility) => AttributeValue::String(visibility.as_str()),
             Self::Weak => AttributeValue::None,
@@ -67,6 +69,7 @@ impl<'a> VarAttribute<'a> {
     fn to_sys(self) -> gccjit_sys::gcc_jit_variable_attribute {
         match self {
             VarAttribute::Alias(_) => gccjit_sys::gcc_jit_variable_attribute::GCC_JIT_VARIABLE_ATTRIBUTE_ALIAS,
+            VarAttribute::Section(_) => gccjit_sys::gcc_jit_variable_attribute::GCC_JIT_VARIABLE_ATTRIBUTE_SECTION,
             VarAttribute::Used => gccjit_sys::gcc_jit_variable_attribute::GCC_JIT_VARIABLE_ATTRIBUTE_USED,
             VarAttribute::Visibility(_) => gccjit_sys::gcc_jit_variable_attribute::GCC_JIT_VARIABLE_ATTRIBUTE_VISIBILITY,
             VarAttribute::Weak => gccjit_sys::gcc_jit_variable_attribute::GCC_JIT_VARIABLE_ATTRIBUTE_WEAK,

@@ -62,6 +62,7 @@ pub enum FnAttribute<'a> {
     Const,
     Weak,
     NonNull(Vec<std::ffi::c_int>),
+    Section(&'a str),
     ArmCmseNonsecureCall,
     ArmCmseNonsecureEntry,
     ArmPcs(&'a str),
@@ -84,8 +85,11 @@ pub enum FnAttribute<'a> {
 impl<'a> FnAttribute<'a> {
     fn get_value(&self) -> AttributeValue<'_> {
         match *self {
-            FnAttribute::Alias(value) | FnAttribute::ArmPcs(value)| FnAttribute::RiscvInterrupt(value)
-                | FnAttribute::Target(value) => AttributeValue::String(value),
+            FnAttribute::Alias(value)
+            | FnAttribute::ArmPcs(value)
+            | FnAttribute::RiscvInterrupt(value)
+            | FnAttribute::Section(value)
+            | FnAttribute::Target(value) => AttributeValue::String(value),
             FnAttribute::Visibility(visibility) => AttributeValue::String(visibility.as_str()),
             FnAttribute::AlwaysInline
             | FnAttribute::Inline
@@ -135,6 +139,7 @@ impl<'a> FnAttribute<'a> {
             FnAttribute::Const => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_CONST,
             FnAttribute::Weak => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_WEAK,
             FnAttribute::NonNull(_) => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_NONNULL,
+            FnAttribute::Section(_) => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_SECTION,
             FnAttribute::ArmCmseNonsecureCall => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_ARM_CMSE_NONSECURE_CALL,
             FnAttribute::ArmCmseNonsecureEntry => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_ARM_CMSE_NONSECURE_ENTRY,
             FnAttribute::ArmPcs(_) => gccjit_sys::gcc_jit_fn_attribute::GCC_JIT_FN_ATTRIBUTE_ARM_PCS,

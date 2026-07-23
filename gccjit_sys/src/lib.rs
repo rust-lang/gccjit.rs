@@ -299,6 +299,7 @@ pub enum gcc_jit_fn_attribute
     GCC_JIT_FN_ATTRIBUTE_X86_STDCALL,
     GCC_JIT_FN_ATTRIBUTE_X86_SYSV_ABI,
     GCC_JIT_FN_ATTRIBUTE_X86_THIS_CALL,
+    GCC_JIT_FN_ATTRIBUTE_SECTION,
 }
 
 #[cfg(feature="master")]
@@ -309,6 +310,7 @@ pub enum gcc_jit_variable_attribute
     GCC_JIT_VARIABLE_ATTRIBUTE_WEAK,
     GCC_JIT_VARIABLE_ATTRIBUTE_ALIAS,
     GCC_JIT_VARIABLE_ATTRIBUTE_USED,
+    GCC_JIT_VARIABLE_ATTRIBUTE_SECTION,
 }
 
 macro_rules! extern_maybe_dlopen {
