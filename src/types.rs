@@ -147,6 +147,35 @@ impl<'ctx> Type<'ctx> {
         })
     }
 
+    /// Make functions called through this function pointer type return their
+    /// value in memory (through a hidden pointer), even if the target ABI
+    /// would normally return it in registers.
+    ///
+    /// It is an error to call this on a type that is not a pointer to a
+    /// function.
+    #[cfg(feature="master")]
+    pub fn set_indirect_return(&self) {
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_type_set_indirect_return(self.ptr);
+            }
+        })
+    }
+
+    /// Return whether functions called through this function pointer type
+    /// return their value in memory (see `set_indirect_return`).
+    ///
+    /// It is an error to call this on a type that is not a pointer to a
+    /// function.
+    #[cfg(feature="master")]
+    pub fn is_indirect_return(&self) -> bool {
+        with_lib(|lib| {
+            unsafe {
+                lib.gcc_jit_type_is_indirect_return(self.ptr) != 0
+            }
+        })
+    }
+
     /// Given a type T, creates a type of const T.
     pub fn make_const(self) -> Type<'ctx> {
         with_lib(|lib| {

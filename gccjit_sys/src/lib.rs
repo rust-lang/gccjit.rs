@@ -782,6 +782,12 @@ extern_maybe_dlopen! {
     fn gcc_jit_function_set_indirect_return(func: *mut gcc_jit_function);
 
     #[cfg(feature="master")]
+    fn gcc_jit_type_set_indirect_return(fn_ptr_type: *mut gcc_jit_type);
+
+    #[cfg(feature="master")]
+    fn gcc_jit_type_is_indirect_return(fn_ptr_type: *mut gcc_jit_type) -> c_int;
+
+    #[cfg(feature="master")]
     fn gcc_jit_set_lang_name(lang_name: *const c_char);
 
     #[cfg(feature="master")]
