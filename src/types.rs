@@ -130,15 +130,6 @@ impl<'ctx> Type<'ctx> {
     }
 
     #[cfg(feature="master")]
-    pub fn set_packed(&self) {
-        with_lib(|lib| {
-            unsafe {
-                lib.gcc_jit_type_set_packed(self.ptr);
-            }
-        })
-    }
-
-    #[cfg(feature="master")]
     pub fn set_addressable(&self) {
         with_lib(|lib| {
             unsafe {
