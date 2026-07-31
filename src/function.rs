@@ -322,7 +322,6 @@ impl<'ctx> Function<'ctx> {
                             value.len() as _,
                         );
                     }
-
                 }
                 AttributeValue::IntArray(value) => {
                     unsafe {
@@ -338,7 +337,7 @@ impl<'ctx> Function<'ctx> {
                     unsafe {
                         lib.gcc_jit_function_add_attribute(self.ptr, attribute.as_sys());
                     }
-                },
+                }
                 AttributeValue::String(string) => {
                     let cstr = CString::new(string).unwrap();
                     unsafe {
