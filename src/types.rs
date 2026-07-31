@@ -10,6 +10,8 @@ use structs::{self, Struct};
 use gccjit_sys::gcc_jit_types::*;
 
 use crate::with_lib;
+#[cfg(feature = "master")]
+use crate::lvalue::AttributeValue;
 
 /// A representation of a type, as it is known to the JIT compiler.
 /// Types can be created through the Typeable trait or they can
@@ -125,15 +127,6 @@ impl<'ctx> Type<'ctx> {
         with_lib(|lib| {
             unsafe {
                 from_ptr(lib.gcc_jit_type_get_pointer(self.ptr))
-            }
-        })
-    }
-
-    #[cfg(feature="master")]
-    pub fn set_packed(&self) {
-        with_lib(|lib| {
-            unsafe {
-                lib.gcc_jit_type_set_packed(self.ptr);
             }
         })
     }
@@ -294,6 +287,55 @@ impl<'ctx> Type<'ctx> {
                 lib.gcc_jit_compatible_types(self.ptr, typ.ptr)
             }
         })
+    }
+
+    #[cfg(feature="master")]
+    pub fn add_attribute(&self, attribute: TypeAttribute) {
+        let value = attribute.get_value();
+        with_lib(|lib| {
+            match value {
+                AttributeValue::Int(value) => {
+                    unsafe {
+                        lib.gcc_jit_type_add_integer_attribute(self.ptr, attribute.as_sys(), value);
+                    }
+                }
+                AttributeValue::None => {
+                    unsafe {
+                        lib.gcc_jit_type_add_attribute(self.ptr, attribute.as_sys());
+                    }
+                }
+                AttributeValue::IntArray(_) => unimplemented!(),
+                AttributeValue::String(_) => unimplemented!(),
+            }
+        });
+    }
+}
+
+
+#[cfg(feature="master")]
+#[derive(Clone, Debug)]
+pub enum TypeAttribute {
+    Aligned(u8),
+    MayAlias,
+    Packed,
+}
+
+#[cfg(feature="master")]
+impl TypeAttribute {
+    fn get_value(&self) -> AttributeValue<'_> {
+        match *self {
+            Self::Aligned(value) => AttributeValue::Int(value as _),
+            Self::MayAlias
+            | Self::Packed => AttributeValue::None,
+        }
+    }
+
+    fn as_sys(&self) -> gccjit_sys::gcc_jit_type_attribute {
+        match *self {
+            Self::Aligned(_) => gccjit_sys::gcc_jit_type_attribute::GCC_JIT_TYPE_ATTRIBUTE_ALIGNED,
+            Self::MayAlias => gccjit_sys::gcc_jit_type_attribute::GCC_JIT_TYPE_ATTRIBUTE_MAY_ALIAS,
+            Self::Packed => gccjit_sys::gcc_jit_type_attribute::GCC_JIT_TYPE_ATTRIBUTE_PACKED,
+        }
     }
 }
 

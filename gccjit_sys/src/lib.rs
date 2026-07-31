@@ -315,6 +315,15 @@ pub enum gcc_jit_variable_attribute
     GCC_JIT_VARIABLE_ATTRIBUTE_RETAIN,
 }
 
+#[cfg(feature="master")]
+#[repr(C)]
+pub enum gcc_jit_type_attribute
+{
+    GCC_JIT_TYPE_ATTRIBUTE_ALIGNED,
+    GCC_JIT_TYPE_ATTRIBUTE_MAY_ALIAS,
+    GCC_JIT_TYPE_ATTRIBUTE_PACKED,
+}
+
 macro_rules! extern_maybe_dlopen {
     ($($(#[cfg($attr_name:ident = $attr_value:expr)])? fn $func_name:ident ($($arg:ident : $arg_type:ty),*) $(-> $return_type:ty)? ;)*) => {
         #[cfg(not(feature="dlopen"))]
@@ -700,9 +709,6 @@ extern_maybe_dlopen! {
     fn gcc_jit_context_new_vector_access(ctxt: *mut gcc_jit_context, loc: *mut gcc_jit_location, vector: *mut gcc_jit_rvalue, index: *mut gcc_jit_rvalue) -> *mut gcc_jit_lvalue;
 
     #[cfg(feature="master")]
-    fn gcc_jit_type_set_packed(typ: *mut gcc_jit_type);
-
-    #[cfg(feature="master")]
     fn gcc_jit_context_convert_vector(ctxt: *mut gcc_jit_context, loc: *mut gcc_jit_location, vector: *mut gcc_jit_rvalue, type_: *mut gcc_jit_type) -> *mut gcc_jit_rvalue;
 
     #[cfg(feature="master")]
@@ -796,4 +802,12 @@ extern_maybe_dlopen! {
                                           loc: *mut gcc_jit_location,
                                           ty: *mut gcc_jit_type,
                                           num_elements: u64) -> *mut gcc_jit_type;
+
+    #[cfg(feature="master")]
+    fn gcc_jit_type_add_attribute(ty: *mut gcc_jit_type, attribute: gcc_jit_type_attribute);
+
+    #[cfg(feature="master")]
+    fn gcc_jit_type_add_integer_attribute(ty: *mut gcc_jit_type,
+                                          attribute: gcc_jit_type_attribute,
+                                          value: c_int);
 }

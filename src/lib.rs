@@ -50,6 +50,8 @@ pub use object::ToObject;
 pub use types::FunctionPtrType;
 pub use types::Type;
 pub use types::Typeable;
+#[cfg(feature="master")]
+pub use types::TypeAttribute;
 pub use field::Field;
 pub use structs::Struct;
 #[cfg(feature="master")]
