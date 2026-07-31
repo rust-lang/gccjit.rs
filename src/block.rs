@@ -116,15 +116,15 @@ impl<'ctx> Block<'ctx> {
     pub fn add_try_catch(
         &self,
         loc: Option<Location<'ctx>>,
-        try_block: Block<'ctx>,
-        catch_block: Block<'ctx>,
+        try_region: Region<'ctx>,
+        catch_region: Region<'ctx>,
     ) {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
         with_lib(|lib| unsafe {
-            lib.gcc_jit_block_add_try_catch(self.ptr, loc_ptr, try_block.ptr, catch_block.ptr);
+            lib.gcc_jit_block_add_try_catch(self.ptr, loc_ptr, region::get_ptr(&try_region), region::get_ptr(&catch_region));
         });
     }
 
@@ -132,15 +132,15 @@ impl<'ctx> Block<'ctx> {
     pub fn add_try_finally(
         &self,
         loc: Option<Location<'ctx>>,
-        try_block: Block<'ctx>,
-        finally_block: Block<'ctx>,
+        try_region: Region<'ctx>,
+        finally_region: Region<'ctx>,
     ) {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
         with_lib(|lib| unsafe {
-            lib.gcc_jit_block_add_try_finally(self.ptr, loc_ptr, try_block.ptr, finally_block.ptr);
+            lib.gcc_jit_block_add_try_finally(self.ptr, loc_ptr, region::get_ptr(&try_region), region::get_ptr(&finally_region));
         });
     }
 
