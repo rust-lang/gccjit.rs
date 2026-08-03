@@ -315,7 +315,7 @@ impl<'ctx> Type<'ctx> {
 #[cfg(feature="master")]
 #[derive(Clone, Debug)]
 pub enum TypeAttribute {
-    Aligned(u8),
+    Aligned(u32),
     MayAlias,
     Packed,
 }
