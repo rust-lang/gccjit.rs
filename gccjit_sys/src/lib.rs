@@ -645,6 +645,9 @@ extern_maybe_dlopen! {
                                      loc: *mut gcc_jit_location,
                                      try_region: *mut gcc_jit_region,
                                      cleanup_region: *mut gcc_jit_region);
+    fn gcc_jit_block_get_successor_count(block: *mut gcc_jit_block) -> c_int;
+    fn gcc_jit_block_get_successor(block: *mut gcc_jit_block,
+                                       index: c_int) -> *mut gcc_jit_block;
     fn gcc_jit_context_new_child_context(parent: *mut gcc_jit_context) -> *mut gcc_jit_context;
     fn gcc_jit_context_dump_reproducer_to_file(parent: *mut gcc_jit_context,
                                                    path: *const c_char);

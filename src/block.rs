@@ -98,6 +98,23 @@ impl<'ctx> Block<'ctx> {
         })
     }
 
+    /// Returns the blocks control can transfer to from the end of this block,
+    /// i.e. the blocks its terminating statement branches to. A block that has
+    /// not been terminated transfers control nowhere, and thus has no
+    /// successors. The order is unspecified, and a block can occur more than
+    /// once (a conditional both of whose edges lead to the same block has two
+    /// successors).
+    pub fn get_successors(&self) -> Vec<Block<'ctx>> {
+        with_lib(|lib| {
+            unsafe {
+                let count = lib.gcc_jit_block_get_successor_count(self.ptr);
+                (0..count)
+                    .map(|index| from_ptr(lib.gcc_jit_block_get_successor(self.ptr, index)))
+                    .collect()
+            }
+        })
+    }
+
     /// Evaluates the rvalue parameter and discards its result. Equivalent
     /// to (void)<expr> in C.
     pub fn add_eval<T: ToRValue<'ctx>>(&self,
