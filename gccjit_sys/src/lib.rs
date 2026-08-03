@@ -826,4 +826,9 @@ extern_maybe_dlopen! {
     fn gcc_jit_blocks_clone(num_blocks: c_int,
                             blocks: *mut *mut gcc_jit_block,
                             out_clones: *mut *mut gcc_jit_block);
+    #[cfg(feature="master")]
+    fn gcc_jit_block_get_successor_count(block: *mut gcc_jit_block) -> c_int;
+    #[cfg(feature="master")]
+    fn gcc_jit_block_get_successor(block: *mut gcc_jit_block,
+                                   index: c_int) -> *mut gcc_jit_block;
 }

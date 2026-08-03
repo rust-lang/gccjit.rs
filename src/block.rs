@@ -95,6 +95,18 @@ impl<'ctx> Block<'ctx> {
         })
     }
 
+    #[cfg(feature = "master")]
+    pub fn get_successors(&self) -> Vec<Block<'ctx>> {
+        with_lib(|lib| {
+            unsafe {
+                let count = lib.gcc_jit_block_get_successor_count(self.ptr);
+                (0..count)
+                    .map(|index| from_ptr(lib.gcc_jit_block_get_successor(self.ptr, index)))
+                    .collect()
+            }
+        })
+    }
+
     /// Evaluates the rvalue parameter and discards its result. Equivalent
     /// to (void)<expr> in C.
     pub fn add_eval<T: ToRValue<'ctx>>(&self, loc: Option<Location<'ctx>>, value: T) {
