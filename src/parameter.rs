@@ -1,12 +1,12 @@
-use std::marker::PhantomData;
-use std::fmt;
 use context::Context;
-use object::{ToObject, Object};
-use object;
-use rvalue::{RValue, ToRValue};
-use rvalue;
-use lvalue::{LValue, ToLValue};
 use lvalue;
+use lvalue::{LValue, ToLValue};
+use object;
+use object::{Object, ToObject};
+use rvalue;
+use rvalue::{RValue, ToRValue};
+use std::fmt;
+use std::marker::PhantomData;
 
 use crate::with_lib;
 
@@ -15,16 +15,12 @@ use crate::with_lib;
 #[derive(Copy, Clone, PartialEq)]
 pub struct Parameter<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_param
+    ptr: *mut gccjit_sys::gcc_jit_param,
 }
 
 impl<'ctx> ToObject<'ctx> for Parameter<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        with_lib(|lib| {
-            unsafe {
-                object::from_ptr(lib.gcc_jit_param_as_object(self.ptr))
-            }
-        })
+        with_lib(|lib| unsafe { object::from_ptr(lib.gcc_jit_param_as_object(self.ptr)) })
     }
 }
 
@@ -37,35 +33,29 @@ impl<'ctx> fmt::Debug for Parameter<'ctx> {
 
 impl<'ctx> ToRValue<'ctx> for Parameter<'ctx> {
     fn to_rvalue(&self) -> RValue<'ctx> {
-        with_lib(|lib| {
-            unsafe {
-                let ptr = lib.gcc_jit_param_as_rvalue(self.ptr);
-                rvalue::from_ptr(ptr)
-            }
+        with_lib(|lib| unsafe {
+            let ptr = lib.gcc_jit_param_as_rvalue(self.ptr);
+            rvalue::from_ptr(ptr)
         })
     }
 }
 
 impl<'ctx> ToLValue<'ctx> for Parameter<'ctx> {
     fn to_lvalue(&self) -> LValue<'ctx> {
-        with_lib(|lib| {
-            unsafe {
-                let ptr = lib.gcc_jit_param_as_lvalue(self.ptr);
-                lvalue::from_ptr(ptr)
-            }
+        with_lib(|lib| unsafe {
+            let ptr = lib.gcc_jit_param_as_lvalue(self.ptr);
+            lvalue::from_ptr(ptr)
         })
     }
 }
 
-
 pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_param) -> Parameter<'ctx> {
     Parameter {
         marker: PhantomData,
-        ptr
+        ptr,
     }
 }
 
 pub unsafe fn get_ptr<'ctx>(loc: &Parameter<'ctx>) -> *mut gccjit_sys::gcc_jit_param {
     loc.ptr
 }
-

@@ -19,62 +19,60 @@
 extern crate gccjit_sys;
 
 mod asm;
-mod types;
-mod context;
-mod object;
-mod location;
-mod field;
-mod structs;
-mod lvalue;
-mod rvalue;
-mod parameter;
-mod function;
 mod block;
-#[cfg(feature="master")]
+mod context;
+mod field;
+mod function;
+mod location;
+mod lvalue;
+mod object;
+mod parameter;
+mod rvalue;
+mod structs;
+#[cfg(feature = "master")]
 mod target_info;
+mod types;
 
-#[cfg(any(feature="dlopen", feature="master"))]
+#[cfg(any(feature = "dlopen", feature = "master"))]
 use std::ffi::CStr;
-#[cfg(feature="dlopen")]
+#[cfg(feature = "dlopen")]
 use std::sync::OnceLock;
 
-pub use context::Context;
+pub use block::{BinaryOp, Block, ComparisonOp, UnaryOp};
 pub use context::CType;
+pub use context::CompileResult;
+pub use context::Context;
 pub use context::GlobalKind;
 pub use context::OptimizationLevel;
-pub use context::CompileResult;
 pub use context::OutputKind;
-pub use location::Location;
-pub use object::Object;
-pub use object::ToObject;
-pub use types::FunctionPtrType;
-pub use types::Type;
-pub use types::Typeable;
-#[cfg(feature="master")]
-pub use types::TypeAttribute;
 pub use field::Field;
-pub use structs::Struct;
-#[cfg(feature="master")]
-pub use lvalue::{VarAttribute, Visibility};
-pub use lvalue::{LValue, TlsModel, ToLValue};
-pub use rvalue::{RValue, ToRValue};
-pub use parameter::Parameter;
-#[cfg(feature="master")]
+#[cfg(feature = "master")]
 pub use function::FnAttribute;
 pub use function::{Function, FunctionType};
-pub use block::{Block, BinaryOp, UnaryOp, ComparisonOp};
-#[cfg(feature="master")]
+pub use location::Location;
+pub use lvalue::{LValue, TlsModel, ToLValue};
+#[cfg(feature = "master")]
+pub use lvalue::{VarAttribute, Visibility};
+pub use object::Object;
+pub use object::ToObject;
+pub use parameter::Parameter;
+pub use rvalue::{RValue, ToRValue};
+pub use structs::Struct;
+#[cfg(feature = "master")]
 pub use target_info::TargetInfo;
+pub use types::FunctionPtrType;
+pub use types::Type;
+#[cfg(feature = "master")]
+pub use types::TypeAttribute;
+pub use types::Typeable;
 
 use gccjit_sys::Libgccjit;
 
-#[cfg(feature="master")]
+#[cfg(feature = "master")]
 pub fn set_global_personality_function_name(name: &'static [u8]) {
     debug_assert!(name.ends_with(b"\0"), "Expecting a NUL-terminated C string");
-    with_lib(|lib| {
-        unsafe {
-            lib.gcc_jit_set_global_personality_function_name(name.as_ptr() as *const _);
-        }
+    with_lib(|lib| unsafe {
+        lib.gcc_jit_set_global_personality_function_name(name.as_ptr() as *const _);
     })
 }
 
@@ -87,43 +85,39 @@ pub struct Version {
 
 impl Version {
     pub fn get() -> Self {
-        with_lib(|lib| {
-            unsafe {
-                Self {
-                    major: lib.gcc_jit_version_major(),
-                    minor: lib.gcc_jit_version_minor(),
-                    patch: lib.gcc_jit_version_patchlevel(),
-                }
+        with_lib(|lib| unsafe {
+            Self {
+                major: lib.gcc_jit_version_major(),
+                minor: lib.gcc_jit_version_minor(),
+                patch: lib.gcc_jit_version_patchlevel(),
             }
         })
     }
 }
 
-#[cfg(feature="master")]
+#[cfg(feature = "master")]
 pub fn is_lto_supported() -> bool {
-    with_lib(|lib| {
-        unsafe {
-            lib.gcc_jit_is_lto_supported()
-        }
-    })
+    with_lib(|lib| unsafe { lib.gcc_jit_is_lto_supported() })
 }
 
-#[cfg(not(feature="dlopen"))]
+#[cfg(not(feature = "dlopen"))]
 fn with_lib<T, F: Fn(&Libgccjit) -> T>(callback: F) -> T {
     callback(&LIB)
 }
 
-#[cfg(feature="dlopen")]
+#[cfg(feature = "dlopen")]
 fn with_lib<T, F: Fn(&Libgccjit) -> T>(callback: F) -> T {
     let lib = LIB.get().and_then(|lib| lib.as_ref());
     match lib {
         Some(lib) => callback(lib),
-        None => panic!("libgccjit needs to be loaded by calling load() before attempting to do any operation"),
+        None => panic!(
+            "libgccjit needs to be loaded by calling load() before attempting to do any operation"
+        ),
     }
 }
 
 /// Returns true if the library was loaded correctly, false otherwise.
-#[cfg(feature="dlopen")]
+#[cfg(feature = "dlopen")]
 pub fn load(path: &CStr) -> Result<(), String> {
     let mut result = Ok(());
     LIB.get_or_init(|| {
@@ -133,25 +127,25 @@ pub fn load(path: &CStr) -> Result<(), String> {
             Err(error) => {
                 result = Err(error);
                 None
-            },
+            }
         }
     });
     result
 }
 
-#[cfg(feature="dlopen")]
+#[cfg(feature = "dlopen")]
 pub fn is_loaded() -> bool {
     LIB.get().is_some()
 }
 
-#[cfg(feature="dlopen")]
+#[cfg(feature = "dlopen")]
 pub static LIB: OnceLock<Option<Libgccjit>> = OnceLock::new();
 
 // Without the dlopen feature, we avoid using OnceLock as to not have any performance impact.
-#[cfg(not(feature="dlopen"))]
+#[cfg(not(feature = "dlopen"))]
 static LIB: Libgccjit = Libgccjit::new();
 
-#[cfg(feature="master")]
+#[cfg(feature = "master")]
 pub fn set_lang_name(lang_name: &'static CStr) {
     unsafe {
         with_lib(|lib| {

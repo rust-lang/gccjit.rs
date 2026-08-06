@@ -1,8 +1,8 @@
-use std::marker::PhantomData;
-use std::fmt;
 use context::Context;
 use object;
 use object::{Object, ToObject};
+use std::fmt;
+use std::marker::PhantomData;
 
 use crate::with_lib;
 
@@ -10,16 +10,12 @@ use crate::with_lib;
 #[derive(Copy, Clone)]
 pub struct Location<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_location
+    ptr: *mut gccjit_sys::gcc_jit_location,
 }
 
 impl<'ctx> ToObject<'ctx> for Location<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        with_lib(|lib| {
-            unsafe {
-                object::from_ptr(lib.gcc_jit_location_as_object(self.ptr))
-            }
-        })
+        with_lib(|lib| unsafe { object::from_ptr(lib.gcc_jit_location_as_object(self.ptr)) })
     }
 }
 
@@ -42,7 +38,7 @@ impl<'ctx> Location<'ctx> {
 pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_location) -> Location<'ctx> {
     Location {
         marker: PhantomData,
-        ptr
+        ptr,
     }
 }
 

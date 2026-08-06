@@ -1,9 +1,9 @@
-use std::marker::PhantomData;
 use std::fmt;
+use std::marker::PhantomData;
 
 use context::Context;
-use object::{ToObject, Object};
 use object;
+use object::{Object, ToObject};
 
 use crate::with_lib;
 
@@ -12,16 +12,12 @@ use crate::with_lib;
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct Field<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_field
+    ptr: *mut gccjit_sys::gcc_jit_field,
 }
 
 impl<'ctx> ToObject<'ctx> for Field<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        with_lib(|lib| {
-            unsafe {
-                object::from_ptr(lib.gcc_jit_field_as_object(self.ptr))
-            }
-        })
+        with_lib(|lib| unsafe { object::from_ptr(lib.gcc_jit_field_as_object(self.ptr)) })
     }
 }
 
@@ -35,7 +31,7 @@ impl<'ctx> fmt::Debug for Field<'ctx> {
 pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_field) -> Field<'ctx> {
     Field {
         marker: PhantomData,
-        ptr
+        ptr,
     }
 }
 

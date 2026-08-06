@@ -60,6 +60,12 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('rust-toolchain') }}
 
+      - name: rustfmt
+        run: |
+          cargo fmt --check
+          cd gccjit_sys
+          cargo fmt --check
+
       - name: Build
         if: ${{ matrix.os == 'ubuntu-24.04' }}
         run: |

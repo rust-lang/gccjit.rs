@@ -1,15 +1,15 @@
-use std::marker::PhantomData;
 use std::fmt;
+use std::marker::PhantomData;
 use std::ptr;
 
 use context::Context;
-use field::Field;
 use field;
-use types::Type;
-use types;
-use location::Location;
+use field::Field;
 use location;
-use object::{ToObject, Object};
+use location::Location;
+use object::{Object, ToObject};
+use types;
+use types::Type;
 
 use crate::with_lib;
 
@@ -18,33 +18,35 @@ use crate::with_lib;
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct Struct<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_struct
+    ptr: *mut gccjit_sys::gcc_jit_struct,
 }
 
 impl<'ctx> Struct<'ctx> {
     pub fn as_type(&self) -> Type<'ctx> {
-        with_lib(|lib| {
-            unsafe {
-                let ptr = lib.gcc_jit_struct_as_type(self.ptr);
-                types::from_ptr(ptr)
-            }
+        with_lib(|lib| unsafe {
+            let ptr = lib.gcc_jit_struct_as_type(self.ptr);
+            types::from_ptr(ptr)
         })
     }
 
-    pub fn set_fields(&self,
-                      location: Option<Location<'ctx>>,
-                      fields: &[Field<'ctx>]) {
+    pub fn set_fields(&self, location: Option<Location<'ctx>>, fields: &[Field<'ctx>]) {
         let loc_ptr = match location {
-                Some(loc) => unsafe { location::get_ptr(&loc) },
-                None => ptr::null_mut()
+            Some(loc) => unsafe { location::get_ptr(&loc) },
+            None => ptr::null_mut(),
         };
         let num_fields = fields.len() as i32;
         with_lib(|lib| {
-            let mut fields_ptrs : Vec<_> = fields.iter()
+            let mut fields_ptrs: Vec<_> = fields
+                .iter()
                 .map(|x| unsafe { field::get_ptr(x) })
                 .collect();
             unsafe {
-                lib.gcc_jit_struct_set_fields(self.ptr, loc_ptr, num_fields, fields_ptrs.as_mut_ptr());
+                lib.gcc_jit_struct_set_fields(
+                    self.ptr,
+                    loc_ptr,
+                    num_fields,
+                    fields_ptrs.as_mut_ptr(),
+                );
             }
         });
         #[cfg(debug_assertions)]
@@ -54,17 +56,14 @@ impl<'ctx> Struct<'ctx> {
     }
 
     pub fn get_field(&self, index: i32) -> Field<'ctx> {
-        let field =
-            with_lib(|lib| {
-                unsafe {
-                    let ptr = lib.gcc_jit_struct_get_field(self.ptr, index);
-                    #[cfg(debug_assertions)]
-                    if ptr.is_null() {
-                        panic!("Null ptr in get_field() from struct: {:?}", self);
-                    }
-                    field::from_ptr(ptr)
-                }
-            });
+        let field = with_lib(|lib| unsafe {
+            let ptr = lib.gcc_jit_struct_get_field(self.ptr, index);
+            #[cfg(debug_assertions)]
+            if ptr.is_null() {
+                panic!("Null ptr in get_field() from struct: {:?}", self);
+            }
+            field::from_ptr(ptr)
+        });
         #[cfg(debug_assertions)]
         if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
             panic!("{}", error);
@@ -73,15 +72,13 @@ impl<'ctx> Struct<'ctx> {
     }
 
     pub fn get_field_count(&self) -> usize {
-        with_lib(|lib| {
-            unsafe {
-                let count = lib.gcc_jit_struct_get_field_count(self.ptr) as usize;
-                #[cfg(debug_assertions)]
-                if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-                    panic!("{}", error);
-                }
-                count
+        with_lib(|lib| unsafe {
+            let count = lib.gcc_jit_struct_get_field_count(self.ptr) as usize;
+            #[cfg(debug_assertions)]
+            if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
+                panic!("{}", error);
             }
+            count
         })
     }
 }
@@ -103,6 +100,6 @@ impl<'ctx> fmt::Debug for Struct<'ctx> {
 pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_struct) -> Struct<'ctx> {
     Struct {
         marker: PhantomData,
-        ptr
+        ptr,
     }
 }
