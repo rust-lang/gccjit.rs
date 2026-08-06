@@ -1,7 +1,7 @@
 use context::Context;
-use std::marker::PhantomData;
-use std::fmt;
 use std::ffi::CStr;
+use std::fmt;
+use std::marker::PhantomData;
 use std::str;
 
 use crate::{context, with_lib};
@@ -12,19 +12,16 @@ use crate::{context, with_lib};
 #[derive(Copy, Clone)]
 pub struct Object<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_object
+    ptr: *mut gccjit_sys::gcc_jit_object,
 }
 
 impl<'ctx> fmt::Debug for Object<'ctx> {
     fn fmt<'a>(&self, fmt: &mut fmt::Formatter<'a>) -> Result<(), fmt::Error> {
-        let rust_str =
-            with_lib(|lib| {
-                unsafe {
-                    let ptr = lib.gcc_jit_object_get_debug_string(self.ptr);
-                    let cstr = CStr::from_ptr(ptr);
-                    str::from_utf8_unchecked(cstr.to_bytes())
-                }
-            });
+        let rust_str = with_lib(|lib| unsafe {
+            let ptr = lib.gcc_jit_object_get_debug_string(self.ptr);
+            let cstr = CStr::from_ptr(ptr);
+            str::from_utf8_unchecked(cstr.to_bytes())
+        });
         fmt.write_str(rust_str)
     }
 }
@@ -47,11 +44,11 @@ impl<'ctx> Deref for ContextRef<'ctx> {
 
 impl<'ctx> Object<'ctx> {
     pub fn get_context(&self) -> ContextRef<'ctx> {
-        with_lib(|lib| {
-            unsafe {
-                ContextRef {
-                    context: ManuallyDrop::new(context::from_ptr(lib.gcc_jit_object_get_context(self.ptr))),
-                }
+        with_lib(|lib| unsafe {
+            ContextRef {
+                context: ManuallyDrop::new(context::from_ptr(
+                    lib.gcc_jit_object_get_context(self.ptr),
+                )),
             }
         })
     }
@@ -71,12 +68,10 @@ impl<'ctx> ToObject<'ctx> for Object<'ctx> {
 pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_object) -> Object<'ctx> {
     Object {
         marker: PhantomData,
-        ptr
+        ptr,
     }
 }
 
 pub unsafe fn get_ptr<'ctx>(object: &Object<'ctx>) -> *mut gccjit_sys::gcc_jit_object {
     object.ptr
 }
-
-

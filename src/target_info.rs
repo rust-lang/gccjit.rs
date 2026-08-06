@@ -1,5 +1,8 @@
 use context::CType;
-use std::{ffi::{CStr, CString}, fmt};
+use std::{
+    ffi::{CStr, CString},
+    fmt,
+};
 
 use crate::with_lib;
 
@@ -18,51 +21,40 @@ impl fmt::Debug for TargetInfo {
 
 impl TargetInfo {
     pub fn cpu_supports(&self, feature: &str) -> bool {
-        let feature =
-            match CString::new(feature) {
-                Ok(feature) => feature,
-                Err(_) => return false,
-            };
-        with_lib(|lib| {
-            unsafe {
-                lib.gcc_jit_target_info_cpu_supports(self.ptr, feature.as_ptr()) != 0
-            }
+        let feature = match CString::new(feature) {
+            Ok(feature) => feature,
+            Err(_) => return false,
+        };
+        with_lib(|lib| unsafe {
+            lib.gcc_jit_target_info_cpu_supports(self.ptr, feature.as_ptr()) != 0
         })
     }
 
     pub fn arch(&self) -> Option<&'static CStr> {
-        with_lib(|lib| {
-            unsafe {
-                let arch = lib.gcc_jit_target_info_arch(self.ptr);
-                if arch.is_null() {
-                    return None;
-                }
-                Some(CStr::from_ptr(arch))
+        with_lib(|lib| unsafe {
+            let arch = lib.gcc_jit_target_info_arch(self.ptr);
+            if arch.is_null() {
+                return None;
             }
+            Some(CStr::from_ptr(arch))
         })
     }
 
     pub fn supports_target_dependent_type(&self, c_type: CType) -> bool {
-        with_lib(|lib| {
-            unsafe {
-                lib.gcc_jit_target_info_supports_target_dependent_type(self.ptr, c_type.to_sys()) != 0
-            }
+        with_lib(|lib| unsafe {
+            lib.gcc_jit_target_info_supports_target_dependent_type(self.ptr, c_type.to_sys()) != 0
         })
     }
 }
 
 impl Drop for TargetInfo {
     fn drop(&mut self) {
-        with_lib(|lib| {
-            unsafe {
-                lib.gcc_jit_target_info_release(self.ptr);
-            }
+        with_lib(|lib| unsafe {
+            lib.gcc_jit_target_info_release(self.ptr);
         })
     }
 }
 
 pub unsafe fn from_ptr(ptr: *mut gccjit_sys::gcc_jit_target_info) -> TargetInfo {
-    TargetInfo {
-        ptr,
-    }
+    TargetInfo { ptr }
 }

@@ -3,12 +3,12 @@
 
 extern crate libc;
 
-#[cfg(feature="dlopen")]
+#[cfg(feature = "dlopen")]
 mod dynload;
 
-#[cfg(feature="dlopen")]
+use libc::{c_char, c_double, c_int, c_long, c_ulong, c_void, size_t, ssize_t, FILE};
+#[cfg(feature = "dlopen")]
 use std::ffi::CStr;
-use libc::{c_char, c_int, FILE, c_void, c_long, c_double, c_ulong, size_t, ssize_t};
 
 // opaque pointers
 pub enum gcc_jit_context {}
@@ -48,7 +48,7 @@ pub enum gcc_jit_str_option {
 #[repr(C)]
 pub enum gcc_jit_int_option {
     GCC_JIT_INT_OPTION_OPTIMIZATION_LEVEL,
-    GCC_JIT_NUM_INT_OPTIONS
+    GCC_JIT_NUM_INT_OPTIONS,
 }
 
 #[repr(C)]
@@ -61,7 +61,7 @@ pub enum gcc_jit_bool_option {
     GCC_JIT_BOOL_OPTION_DUMP_EVERYTHING,
     GCC_JIT_BOOL_OPTION_SELFCHECK_GC,
     GCC_JIT_BOOL_OPTION_KEEP_INTERMEDIATES,
-    GCC_JIT_NUM_BOOL_OPTIONS
+    GCC_JIT_NUM_BOOL_OPTIONS,
 }
 
 #[repr(C)]
@@ -69,7 +69,7 @@ pub enum gcc_jit_output_kind {
     GCC_JIT_OUTPUT_KIND_ASSEMBLER,
     GCC_JIT_OUTPUT_KIND_OBJECT_FILE,
     GCC_JIT_OUTPUT_KIND_DYNAMIC_LIBRARY,
-    GCC_JIT_OUTPUT_KIND_EXECUTABLE
+    GCC_JIT_OUTPUT_KIND_EXECUTABLE,
 }
 
 #[repr(C)]
@@ -136,65 +136,62 @@ pub enum gcc_jit_types {
 #[repr(C)]
 pub enum gcc_jit_function_kind {
     /* Function is defined by the client code and visible
-       by name outside of the JIT. */
+    by name outside of the JIT. */
     GCC_JIT_FUNCTION_EXPORTED,
     /* Function is defined by the client code, but is invisible
-       outside of the JIT. Analogous to a "static" function. */
+    outside of the JIT. Analogous to a "static" function. */
     GCC_JIT_FUNCTION_INTERNAL,
     /* Function is not defined by the client code; we're merely
-       referring to it. Analogous to using an "extern" function from a
-       header file. */
+    referring to it. Analogous to using an "extern" function from a
+    header file. */
     GCC_JIT_FUNCTION_IMPORTED,
     /* Function is only ever inlined into other functions, and is
-       invisible outside of the JIT.
-       Analogous to prefixing with "inline" and adding
-       __attribute__((always_inline)).
-       Inlining will only occur when the optimization level is
-       above 0; when optimization is off, this is essentially the
-       same as GCC_JIT_FUNCTION_INTERNAL. */
-    GCC_JIT_FUNCTION_ALWAYS_INLINE
+    invisible outside of the JIT.
+    Analogous to prefixing with "inline" and adding
+    __attribute__((always_inline)).
+    Inlining will only occur when the optimization level is
+    above 0; when optimization is off, this is essentially the
+    same as GCC_JIT_FUNCTION_INTERNAL. */
+    GCC_JIT_FUNCTION_ALWAYS_INLINE,
 }
 
 #[repr(C)]
-pub enum gcc_jit_global_kind
-{
+pub enum gcc_jit_global_kind {
     /* Global is defined by the client code and visible
-       by name outside of this JIT context via gcc_jit_result_get_global. */
+    by name outside of this JIT context via gcc_jit_result_get_global. */
     GCC_JIT_GLOBAL_EXPORTED,
     /* Global is defined by the client code, but is invisible
-       outside of this JIT context. Analogous to a "static" global. */
+    outside of this JIT context. Analogous to a "static" global. */
     GCC_JIT_GLOBAL_INTERNAL,
     /* Global is not defined by the client code; we're merely
-       referring to it. Analogous to using an "extern" global from a
-       header file. */
-    GCC_JIT_GLOBAL_IMPORTED
+    referring to it. Analogous to using an "extern" global from a
+    header file. */
+    GCC_JIT_GLOBAL_IMPORTED,
 }
 
 #[repr(C)]
-pub enum gcc_jit_unary_op
-{
+pub enum gcc_jit_unary_op {
     /* Negate an arithmetic value; analogous to:
-       -(EXPR)
-       in C. */
+    -(EXPR)
+    in C. */
     GCC_JIT_UNARY_OP_MINUS,
     /* Bitwise negation of an integer value (one's complement); analogous
-       to:
-       ~(EXPR)
-       in C. */
+    to:
+    ~(EXPR)
+    in C. */
     GCC_JIT_UNARY_OP_BITWISE_NEGATE,
     /* Logical negation of an arithmetic or pointer value; analogous to:
-       !(EXPR)
-       in C. */
+    !(EXPR)
+    in C. */
     GCC_JIT_UNARY_OP_LOGICAL_NEGATE,
     /* Absolute value of an arithmetic expression; analogous to:
-       abs (EXPR)
-       in C. */
-    GCC_JIT_UNARY_OP_ABS
+    abs (EXPR)
+    in C. */
+    GCC_JIT_UNARY_OP_ABS,
 }
 
 #[repr(C)]
-pub enum gcc_jit_binary_op
-{
+pub enum gcc_jit_binary_op {
     /* Addition of arithmetic values; analogous to:
     (EXPR_A) + (EXPR_B)
     in C.
@@ -246,12 +243,11 @@ pub enum gcc_jit_binary_op
     /* Right shift; analogous to:
     (EXPR_A) >> (EXPR_B)
     in C. */
-    GCC_JIT_BINARY_OP_RSHIFT
+    GCC_JIT_BINARY_OP_RSHIFT,
 }
 
 #[repr(C)]
-pub enum gcc_jit_comparison
-{
+pub enum gcc_jit_comparison {
     /* (EXPR_A) == (EXPR_B). */
     GCC_JIT_COMPARISON_EQ,
     /* (EXPR_A) != (EXPR_B). */
@@ -263,13 +259,12 @@ pub enum gcc_jit_comparison
     /* (EXPR_A) > (EXPR_B). */
     GCC_JIT_COMPARISON_GT,
     /* (EXPR_A) >= (EXPR_B). */
-    GCC_JIT_COMPARISON_GE
+    GCC_JIT_COMPARISON_GE,
 }
 
-#[cfg(feature="master")]
+#[cfg(feature = "master")]
 #[repr(C)]
-pub enum gcc_jit_fn_attribute
-{
+pub enum gcc_jit_fn_attribute {
     GCC_JIT_FN_ATTRIBUTE_ALIAS,
     GCC_JIT_FN_ATTRIBUTE_ALWAYS_INLINE,
     GCC_JIT_FN_ATTRIBUTE_INLINE,
@@ -303,10 +298,9 @@ pub enum gcc_jit_fn_attribute
     GCC_JIT_FN_ATTRIBUTE_RETAIN,
 }
 
-#[cfg(feature="master")]
+#[cfg(feature = "master")]
 #[repr(C)]
-pub enum gcc_jit_variable_attribute
-{
+pub enum gcc_jit_variable_attribute {
     GCC_JIT_VARIABLE_ATTRIBUTE_VISIBILITY,
     GCC_JIT_VARIABLE_ATTRIBUTE_WEAK,
     GCC_JIT_VARIABLE_ATTRIBUTE_ALIAS,
@@ -315,10 +309,9 @@ pub enum gcc_jit_variable_attribute
     GCC_JIT_VARIABLE_ATTRIBUTE_RETAIN,
 }
 
-#[cfg(feature="master")]
+#[cfg(feature = "master")]
 #[repr(C)]
-pub enum gcc_jit_type_attribute
-{
+pub enum gcc_jit_type_attribute {
     GCC_JIT_TYPE_ATTRIBUTE_ALIGNED,
     GCC_JIT_TYPE_ATTRIBUTE_MAY_ALIAS,
     GCC_JIT_TYPE_ATTRIBUTE_PACKED,

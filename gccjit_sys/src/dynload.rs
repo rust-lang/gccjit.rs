@@ -4,8 +4,8 @@ pub use self::platform::Library;
 
 #[cfg(unix)]
 mod platform {
-    use std::ffi::{CStr, c_void};
-    use libc::{c_char,  RTLD_NOW};
+    use libc::{c_char, RTLD_NOW};
+    use std::ffi::{c_void, CStr};
 
     pub struct Library(*mut c_void);
 
@@ -18,8 +18,7 @@ mod platform {
             let handle = dlopen(path.as_ptr() as *const c_char, RTLD_NOW);
             if handle.is_null() {
                 Self::error()
-            }
-            else {
+            } else {
                 Ok(Self(handle))
             }
         }
@@ -29,8 +28,7 @@ mod platform {
             let ptr = dlsym(self.0, sym.as_ptr() as *const c_char);
             if ptr.is_null() {
                 Self::error()
-            }
-            else {
+            } else {
                 Ok(ptr.cast())
             }
         }
@@ -39,7 +37,8 @@ mod platform {
             use libc::dlerror;
             let cstr = dlerror();
             let cstr = CStr::from_ptr(cstr);
-            let string = cstr.to_str()
+            let string = cstr
+                .to_str()
                 .map_err(|error| error.to_string())?
                 .to_string();
             Err(string)
@@ -57,11 +56,11 @@ mod platform {
 
 #[cfg(windows)]
 mod platform {
-    use std::ffi::{CStr, OsString, c_void};
-    use std::os::windows::ffi::OsStrExt;
     use libc::c_char;
+    use std::ffi::{c_void, CStr, OsString};
+    use std::os::windows::ffi::OsStrExt;
 
-    #[link(name="kernel32")]
+    #[link(name = "kernel32")]
     extern "system" {
         fn LoadLibraryW(lpLibFileName: *const u16) -> *mut c_void;
         fn GetProcAddress(hModule: *mut c_void, lpProcName: *const c_char) -> *mut c_void;
@@ -81,8 +80,7 @@ mod platform {
             let handle = LoadLibraryW(w.as_ptr());
             if handle.is_null() {
                 Err("cannot load library".to_string())
-            }
-            else {
+            } else {
                 Ok(Self(handle))
             }
         }
@@ -91,8 +89,7 @@ mod platform {
             let ptr = GetProcAddress(self.0, sym.as_ptr() as *const c_char);
             if ptr.is_null() {
                 Err("cannot load symbol".to_string())
-            }
-            else {
+            } else {
                 Ok(ptr.cast())
             }
         }
@@ -100,7 +97,9 @@ mod platform {
 
     impl Drop for Library {
         fn drop(&mut self) {
-            unsafe { FreeLibrary(self.0); }
+            unsafe {
+                FreeLibrary(self.0);
+            }
         }
     }
 }

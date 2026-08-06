@@ -1,20 +1,20 @@
-use std::marker::PhantomData;
-use std::fmt;
-use std::ptr;
-use std::mem;
-use std::ops::{Add, Sub, Mul, Div, Rem, BitAnd, BitOr, BitXor, Shl, Shr};
-use context::Context;
-use object::{ToObject, Object};
-use object;
-use types::Type;
-use types;
-use field::Field;
-use field;
-use lvalue::LValue;
-use lvalue;
-use location::Location;
-use location;
 use block::BinaryOp;
+use context::Context;
+use field;
+use field::Field;
+use location;
+use location::Location;
+use lvalue;
+use lvalue::LValue;
+use object;
+use object::{Object, ToObject};
+use std::fmt;
+use std::marker::PhantomData;
+use std::mem;
+use std::ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Shr, Sub};
+use std::ptr;
+use types;
+use types::Type;
 
 use crate::with_lib;
 
@@ -24,7 +24,7 @@ use crate::with_lib;
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct RValue<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_rvalue
+    ptr: *mut gccjit_sys::gcc_jit_rvalue,
 }
 
 /// ToRValue is a trait implemented by types that can be converted to, or
@@ -35,11 +35,7 @@ pub trait ToRValue<'ctx> {
 
 impl<'ctx> ToObject<'ctx> for RValue<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        with_lib(|lib| {
-            unsafe {
-                object::from_ptr(lib.gcc_jit_rvalue_as_object(self.ptr))
-            }
-        })
+        with_lib(|lib| unsafe { object::from_ptr(lib.gcc_jit_rvalue_as_object(self.ptr)) })
     }
 }
 
@@ -62,25 +58,28 @@ macro_rules! binary_operator_for {
             type Output = RValue<'ctx>;
 
             fn $name(self, rhs: RValue<'ctx>) -> RValue<'ctx> {
-                with_lib(|lib| {
-                    unsafe {
-                        let rhs_rvalue = rhs.to_rvalue();
-                        let obj_ptr = object::get_ptr(&self.to_object());
-                        let ctx_ptr = lib.gcc_jit_object_get_context(obj_ptr);
-                        let ty = rhs.get_type();
-                        let ptr = lib.gcc_jit_context_new_binary_op(ctx_ptr, ptr::null_mut(),
-                            mem::transmute::<BinaryOp, gccjit_sys::gcc_jit_binary_op>($op),
-                            types::get_ptr(&ty), self.ptr, rhs_rvalue.ptr);
-                        #[cfg(debug_assertions)]
-                        if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-                            panic!("{}", error);
-                        }
-                        from_ptr(ptr)
+                with_lib(|lib| unsafe {
+                    let rhs_rvalue = rhs.to_rvalue();
+                    let obj_ptr = object::get_ptr(&self.to_object());
+                    let ctx_ptr = lib.gcc_jit_object_get_context(obj_ptr);
+                    let ty = rhs.get_type();
+                    let ptr = lib.gcc_jit_context_new_binary_op(
+                        ctx_ptr,
+                        ptr::null_mut(),
+                        mem::transmute::<BinaryOp, gccjit_sys::gcc_jit_binary_op>($op),
+                        types::get_ptr(&ty),
+                        self.ptr,
+                        rhs_rvalue.ptr,
+                    );
+                    #[cfg(debug_assertions)]
+                    if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
+                        panic!("{}", error);
                     }
+                    from_ptr(ptr)
                 })
             }
         }
-    }
+    };
 }
 
 // Operator overloads for ease of manipulation of rvalues
@@ -98,96 +97,79 @@ binary_operator_for!(Shr<RValue<'ctx>>, shr, BinaryOp::RShift);
 impl<'ctx> RValue<'ctx> {
     /// Gets the type of this RValue.
     pub fn get_type(&self) -> Type<'ctx> {
-        with_lib(|lib| {
-            unsafe {
-                let ptr = lib.gcc_jit_rvalue_get_type(self.ptr);
-                types::from_ptr(ptr)
-            }
+        with_lib(|lib| unsafe {
+            let ptr = lib.gcc_jit_rvalue_get_type(self.ptr);
+            types::from_ptr(ptr)
         })
     }
 
     /// Sets the location of this RValue.
-    #[cfg(feature="master")]
+    #[cfg(feature = "master")]
     pub fn set_location(&self, loc: Location) {
-        with_lib(|lib| {
-            unsafe {
-                let loc_ptr = location::get_ptr(&loc);
-                lib.gcc_jit_rvalue_set_location(self.ptr, loc_ptr);
-            }
+        with_lib(|lib| unsafe {
+            let loc_ptr = location::get_ptr(&loc);
+            lib.gcc_jit_rvalue_set_location(self.ptr, loc_ptr);
         })
     }
 
     /// Change the type of this RValue.
-    #[cfg(feature="master")]
+    #[cfg(feature = "master")]
     pub fn set_type(&self, typ: Type<'ctx>) {
-        with_lib(|lib| {
-            unsafe {
-                let type_ptr = types::get_ptr(&typ);
-                lib.gcc_jit_rvalue_set_type(self.ptr, type_ptr);
-            }
+        with_lib(|lib| unsafe {
+            let type_ptr = types::get_ptr(&typ);
+            lib.gcc_jit_rvalue_set_type(self.ptr, type_ptr);
         })
     }
 
     /// Given an RValue x and a Field f, returns an RValue representing
     /// C's x.f.
-    pub fn access_field(&self,
-                        loc: Option<Location<'ctx>>,
-                        field: Field<'ctx>) -> RValue<'ctx> {
+    pub fn access_field(&self, loc: Option<Location<'ctx>>, field: Field<'ctx>) -> RValue<'ctx> {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
-            None => ptr::null_mut()
+            None => ptr::null_mut(),
         };
-        with_lib(|lib| {
-            unsafe {
-                let ptr = lib.gcc_jit_rvalue_access_field(self.ptr,
-                    loc_ptr,
-                    field::get_ptr(&field));
-                from_ptr(ptr)
-            }
+        with_lib(|lib| unsafe {
+            let ptr = lib.gcc_jit_rvalue_access_field(self.ptr, loc_ptr, field::get_ptr(&field));
+            from_ptr(ptr)
         })
     }
 
     /// Given an RValue x and a Field f, returns an LValue representing
     /// C's x->f.
-    pub fn dereference_field(&self,
-                             loc: Option<Location<'ctx>>,
-                             field: Field<'ctx>) -> LValue<'ctx> {
+    pub fn dereference_field(
+        &self,
+        loc: Option<Location<'ctx>>,
+        field: Field<'ctx>,
+    ) -> LValue<'ctx> {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
-            None => ptr::null_mut()
+            None => ptr::null_mut(),
         };
-        with_lib(|lib| {
-            unsafe {
-                let ptr = lib.gcc_jit_rvalue_dereference_field(self.ptr,
-                    loc_ptr,
-                    field::get_ptr(&field));
-                #[cfg(debug_assertions)]
-                if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-                    panic!("{}", error);
-                }
-                lvalue::from_ptr(ptr)
+        with_lib(|lib| unsafe {
+            let ptr =
+                lib.gcc_jit_rvalue_dereference_field(self.ptr, loc_ptr, field::get_ptr(&field));
+            #[cfg(debug_assertions)]
+            if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
+                panic!("{}", error);
             }
+            lvalue::from_ptr(ptr)
         })
     }
 
     /// Given a RValue x, returns an RValue that represents *x.
-    pub fn dereference(&self,
-                       loc: Option<Location<'ctx>>) -> LValue<'ctx> {
+    pub fn dereference(&self, loc: Option<Location<'ctx>>) -> LValue<'ctx> {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
-            None => ptr::null_mut()
+            None => ptr::null_mut(),
         };
-        with_lib(|lib| {
-            unsafe {
-                let ptr = lib.gcc_jit_rvalue_dereference(self.ptr,
-                    loc_ptr);
+        with_lib(|lib| unsafe {
+            let ptr = lib.gcc_jit_rvalue_dereference(self.ptr, loc_ptr);
 
-                #[cfg(debug_assertions)]
-                if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-                    panic!("{}", error);
-                }
-                lvalue::from_ptr(ptr)
+            #[cfg(debug_assertions)]
+            if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
+                panic!("{}", error);
             }
+            lvalue::from_ptr(ptr)
         })
     }
 
@@ -206,7 +188,7 @@ impl<'ctx> RValue<'ctx> {
 pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_rvalue) -> RValue<'ctx> {
     RValue {
         marker: PhantomData,
-        ptr
+        ptr,
     }
 }
 
