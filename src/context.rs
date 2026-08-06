@@ -23,7 +23,21 @@ use target_info::{self, TargetInfo};
 use types;
 use Type;
 
-use crate::with_lib;
+use crate::{with_lib, with_lib_without_error_check};
+
+pub(crate) trait ContextGetter<'ctx> {
+    fn context(&self) -> crate::ContextRef<'ctx>;
+}
+
+impl<'ctx> ContextGetter<'ctx> for Context<'ctx> {
+    fn context(&self) -> crate::ContextRef<'ctx> {
+        unsafe {
+            crate::ContextRef {
+                context: std::mem::ManuallyDrop::new(from_ptr(self.ptr)),
+            }
+        }
+    }
+}
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -87,7 +101,7 @@ impl CompileResult {
     /// will transmute this pointer to a function pointer type.
     pub fn get_function<S: AsRef<str>>(&self, name: S) -> *mut () {
         let c_str = CString::new(name.as_ref()).unwrap();
-        with_lib(|lib| unsafe {
+        with_lib_without_error_check(|lib| unsafe {
             let func = lib.gcc_jit_result_get_code(self.ptr, c_str.as_ptr());
             mem::transmute(func)
         })
@@ -101,7 +115,7 @@ impl CompileResult {
     /// check whether or not the returned pointer is null.
     pub fn get_global<S: AsRef<str>>(&self, name: S) -> *mut () {
         let c_str = CString::new(name.as_ref()).unwrap();
-        with_lib(|lib| unsafe {
+        with_lib_without_error_check(|lib| unsafe {
             let ptr = lib.gcc_jit_result_get_global(self.ptr, c_str.as_ptr());
             mem::transmute(ptr)
         })
@@ -110,7 +124,7 @@ impl CompileResult {
 
 impl Drop for CompileResult {
     fn drop(&mut self) {
-        with_lib(|lib| unsafe {
+        with_lib_without_error_check(|lib| unsafe {
             lib.gcc_jit_result_release(self.ptr);
         })
     }
@@ -123,10 +137,16 @@ pub struct Case<'ctx> {
 
 impl<'ctx> ToObject<'ctx> for Case<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        with_lib(|lib| unsafe {
+        with_lib_without_error_check(|lib| unsafe {
             let ptr = lib.gcc_jit_case_as_object(self.ptr);
             object::from_ptr(ptr)
         })
+    }
+}
+
+impl<'ctx> ContextGetter<'ctx> for Case<'ctx> {
+    fn context(&self) -> crate::ContextRef<'ctx> {
+        self.to_object().context()
     }
 }
 
@@ -147,7 +167,7 @@ pub struct Context<'ctx> {
 
 impl Default for Context<'static> {
     fn default() -> Context<'static> {
-        with_lib(|lib| unsafe {
+        with_lib_without_error_check(|lib| unsafe {
             Context {
                 marker: PhantomData,
                 ptr: lib.gcc_jit_context_acquire(),
@@ -161,7 +181,7 @@ impl<'ctx> Context<'ctx> {
     pub fn set_program_name<S: AsRef<str>>(&self, name: S) {
         let name_ref = name.as_ref();
         let c_str = CString::new(name_ref).unwrap();
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_context_set_str_option(
                 self.ptr,
                 GCC_JIT_STR_OPTION_PROGNAME,
@@ -172,21 +192,23 @@ impl<'ctx> Context<'ctx> {
 
     pub fn add_command_line_option<S: AsRef<str>>(&self, name: S) {
         let c_str = CString::new(name.as_ref()).unwrap();
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_context_add_command_line_option(self.ptr, c_str.as_ptr())
         })
     }
 
     pub fn add_driver_option<S: AsRef<str>>(&self, name: S) {
         let c_str = CString::new(name.as_ref()).unwrap();
-        with_lib(|lib| unsafe { lib.gcc_jit_context_add_driver_option(self.ptr, c_str.as_ptr()) })
+        with_lib(self, |lib| unsafe {
+            lib.gcc_jit_context_add_driver_option(self.ptr, c_str.as_ptr())
+        })
     }
 
     /// Sets the optimization level that the JIT compiler will use.
     /// The higher the optimization level, the longer compilation will
     /// take.
     pub fn set_optimization_level(&self, level: OptimizationLevel) {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_context_set_int_option(
                 self.ptr,
                 GCC_JIT_INT_OPTION_OPTIMIZATION_LEVEL,
@@ -198,7 +220,7 @@ impl<'ctx> Context<'ctx> {
     #[cfg(feature = "master")]
     pub fn set_output_ident(&self, ident: &str) {
         let c_str = CString::new(ident).unwrap();
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_context_set_output_ident(self.ptr, c_str.as_ptr());
         })
     }
@@ -206,7 +228,7 @@ impl<'ctx> Context<'ctx> {
     #[cfg(feature = "master")]
     pub fn set_special_chars_allowed_in_func_names(&self, value: &str) {
         let c_str = CString::new(value).unwrap();
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_context_set_str_option(
                 self.ptr,
                 GCC_JIT_STR_OPTION_SPECIAL_CHARS_IN_FUNC_NAMES,
@@ -216,7 +238,7 @@ impl<'ctx> Context<'ctx> {
     }
 
     pub fn set_debug_info(&self, value: bool) {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_context_set_bool_option(
                 self.ptr,
                 GCC_JIT_BOOL_OPTION_DEBUGINFO,
@@ -226,7 +248,7 @@ impl<'ctx> Context<'ctx> {
     }
 
     pub fn set_keep_intermediates(&self, value: bool) {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_context_set_bool_option(
                 self.ptr,
                 GCC_JIT_BOOL_OPTION_KEEP_INTERMEDIATES,
@@ -236,13 +258,13 @@ impl<'ctx> Context<'ctx> {
     }
 
     pub fn set_print_errors_to_stderr(&self, enabled: bool) {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_context_set_bool_print_errors_to_stderr(self.ptr, enabled as c_int);
         })
     }
 
     pub fn set_dump_everything(&self, value: bool) {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_context_set_bool_option(
                 self.ptr,
                 GCC_JIT_BOOL_OPTION_DUMP_EVERYTHING,
@@ -252,7 +274,7 @@ impl<'ctx> Context<'ctx> {
     }
 
     pub fn set_dump_initial_gimple(&self, value: bool) {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_context_set_bool_option(
                 self.ptr,
                 GCC_JIT_BOOL_OPTION_DUMP_INITIAL_GIMPLE,
@@ -264,7 +286,7 @@ impl<'ctx> Context<'ctx> {
     /// When set to true, dumps the code that the JIT generates to standard
     /// out during compilation.
     pub fn set_dump_code_on_compile(&self, value: bool) {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_context_set_bool_option(
                 self.ptr,
                 GCC_JIT_BOOL_OPTION_DUMP_GENERATED_CODE,
@@ -274,7 +296,7 @@ impl<'ctx> Context<'ctx> {
     }
 
     pub fn set_allow_unreachable_blocks(&self, value: bool) {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_context_set_bool_allow_unreachable_blocks(self.ptr, value as i32);
         })
     }
@@ -283,7 +305,7 @@ impl<'ctx> Context<'ctx> {
     /// the means to access functions and globals that have currently
     /// been JIT compiled.
     pub fn compile(&self) -> CompileResult {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             CompileResult {
                 ptr: lib.gcc_jit_context_compile(self.ptr),
             }
@@ -293,7 +315,7 @@ impl<'ctx> Context<'ctx> {
     /// Compiles the context and saves the result to a file. The
     /// type of the file is controlled by the OutputKind parameter.
     pub fn compile_to_file<S: AsRef<str>>(&self, kind: OutputKind, file: S) {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let file_ref = file.as_ref();
             let cstr = CString::new(file_ref).unwrap();
             lib.gcc_jit_context_compile_to_file(
@@ -306,7 +328,7 @@ impl<'ctx> Context<'ctx> {
 
     #[cfg(feature = "master")]
     pub fn get_target_info(&self) -> TargetInfo {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             target_info::from_ptr(lib.gcc_jit_context_get_target_info(self.ptr))
         })
     }
@@ -315,7 +337,7 @@ impl<'ctx> Context<'ctx> {
     /// is a fully-featured context, but it has a lifetime that is strictly
     /// less than the lifetime that spawned it.
     pub fn new_child_context<'b>(&'b self) -> Context<'b> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             Context {
                 marker: PhantomData,
                 ptr: lib.gcc_jit_context_new_child_context(self.ptr),
@@ -331,7 +353,7 @@ impl<'ctx> Context<'ctx> {
     ) -> Case<'ctx> {
         let min_value = min_value.to_rvalue();
         let max_value = max_value.to_rvalue();
-        let result = with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             Case {
                 marker: PhantomData,
                 ptr: lib.gcc_jit_context_new_case(
@@ -341,12 +363,7 @@ impl<'ctx> Context<'ctx> {
                     block::get_ptr(&dest_block),
                 ),
             }
-        });
-        #[cfg(debug_assertions)]
-        if let Ok(Some(error)) = self.get_last_error() {
-            panic!("{}", error);
-        }
-        result
+        })
     }
 
     /// Creates a new location for use by gdb when debugging a JIT compiled
@@ -358,14 +375,10 @@ impl<'ctx> Context<'ctx> {
         line: i32,
         col: i32,
     ) -> Location<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let filename_ref = filename.as_ref();
             let cstr = CString::new(filename_ref).unwrap();
             let ptr = lib.gcc_jit_context_new_location(self.ptr, cstr.as_ptr(), line, col);
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             location::from_ptr(ptr)
         })
     }
@@ -377,7 +390,7 @@ impl<'ctx> Context<'ctx> {
         ty: Type<'a>,
         name: S,
     ) -> LValue<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
@@ -390,10 +403,6 @@ impl<'ctx> Context<'ctx> {
                 types::get_ptr(&ty),
                 cstr.as_ptr(),
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             lvalue::from_ptr(ptr)
         })
     }
@@ -408,24 +417,16 @@ impl<'ctx> Context<'ctx> {
     }
 
     pub fn new_c_type<'a>(&'a self, c_type: CType) -> types::Type<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_get_type(get_ptr(self), c_type.to_sys());
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             types::from_ptr(ptr)
         })
     }
 
     pub fn new_int_type<'a>(&'a self, num_bytes: i32, signed: bool) -> types::Type<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ctx_ptr = get_ptr(self);
             let ptr = lib.gcc_jit_context_get_int_type(ctx_ptr, num_bytes, signed as i32);
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             types::from_ptr(ptr)
         })
     }
@@ -443,7 +444,7 @@ impl<'ctx> Context<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let cstr = CString::new(name_ref).unwrap();
             let ptr = lib.gcc_jit_context_new_field(
                 self.ptr,
@@ -451,10 +452,6 @@ impl<'ctx> Context<'ctx> {
                 types::get_ptr(&ty),
                 cstr.as_ptr(),
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             field::from_ptr(ptr)
         })
     }
@@ -471,17 +468,13 @@ impl<'ctx> Context<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_array_type(
                 self.ptr,
                 loc_ptr,
                 types::get_ptr(&ty),
                 num_elements as c_ulong,
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             types::from_ptr(ptr)
         })
     }
@@ -499,28 +492,20 @@ impl<'ctx> Context<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_array_type_u64(
                 self.ptr,
                 loc_ptr,
                 types::get_ptr(&ty),
                 num_elements,
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             types::from_ptr(ptr)
         })
     }
 
     pub fn new_vector_type<'a>(&'a self, ty: types::Type<'a>, num_units: u64) -> types::Type<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_type_get_vector(types::get_ptr(&ty), num_units as _);
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             types::from_ptr(ptr)
         })
     }
@@ -540,7 +525,7 @@ impl<'ctx> Context<'ctx> {
             None => ptr::null_mut(),
         };
         let num_fields = fields.len() as i32;
-        with_lib(|lib| {
+        with_lib(self, |lib| {
             let mut fields_ptrs: Vec<_> = fields
                 .iter()
                 .map(|x| unsafe { field::get_ptr(x) })
@@ -554,10 +539,6 @@ impl<'ctx> Context<'ctx> {
                     num_fields,
                     fields_ptrs.as_mut_ptr(),
                 );
-                #[cfg(debug_assertions)]
-                if let Ok(Some(error)) = self.get_last_error() {
-                    panic!("{}", error);
-                }
                 structs::from_ptr(ptr)
             }
         })
@@ -575,13 +556,9 @@ impl<'ctx> Context<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let cstr = CString::new(name_ref).unwrap();
             let ptr = lib.gcc_jit_context_new_opaque_struct(self.ptr, loc_ptr, cstr.as_ptr());
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             structs::from_ptr(ptr)
         })
     }
@@ -599,7 +576,7 @@ impl<'ctx> Context<'ctx> {
             None => ptr::null_mut(),
         };
         let num_fields = fields.len() as i32;
-        with_lib(|lib| {
+        with_lib(self, |lib| {
             let mut fields_ptrs: Vec<_> = fields
                 .iter()
                 .map(|x| unsafe { field::get_ptr(x) })
@@ -613,10 +590,6 @@ impl<'ctx> Context<'ctx> {
                     num_fields,
                     fields_ptrs.as_mut_ptr(),
                 );
-                #[cfg(debug_assertions)]
-                if let Ok(Some(error)) = self.get_last_error() {
-                    panic!("{}", error);
-                }
                 types::from_ptr(ptr)
             }
         })
@@ -638,7 +611,7 @@ impl<'ctx> Context<'ctx> {
             None => ptr::null_mut(),
         };
         let num_types = param_types.len() as i32;
-        with_lib(|lib| {
+        with_lib(self, |lib| {
             let mut types_ptrs: Vec<_> = param_types
                 .iter()
                 .map(|x| unsafe { types::get_ptr(x) })
@@ -652,10 +625,6 @@ impl<'ctx> Context<'ctx> {
                     types_ptrs.as_mut_ptr(),
                     is_variadic as i32,
                 );
-                #[cfg(debug_assertions)]
-                if let Ok(Some(error)) = self.get_last_error() {
-                    panic!("{}", error);
-                }
                 types::from_ptr(ptr)
             }
         })
@@ -678,7 +647,7 @@ impl<'ctx> Context<'ctx> {
             None => ptr::null_mut(),
         };
         let num_params = params.len() as i32;
-        with_lib(|lib| {
+        with_lib(self, |lib| {
             let mut params_ptrs: Vec<_> = params
                 .iter()
                 .map(|x| unsafe { parameter::get_ptr(x) })
@@ -695,10 +664,6 @@ impl<'ctx> Context<'ctx> {
                     params_ptrs.as_mut_ptr(),
                     is_variadic as i32,
                 );
-                #[cfg(debug_assertions)]
-                if let Ok(Some(error)) = self.get_last_error() {
-                    panic!("{}", error);
-                }
                 function::from_ptr(ptr)
             }
         })
@@ -719,7 +684,7 @@ impl<'ctx> Context<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_binary_op(
                 self.ptr,
                 loc_ptr,
@@ -728,10 +693,6 @@ impl<'ctx> Context<'ctx> {
                 rvalue::get_ptr(&left_rvalue),
                 rvalue::get_ptr(&right_rvalue),
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
@@ -749,7 +710,7 @@ impl<'ctx> Context<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_unary_op(
                 self.ptr,
                 loc_ptr,
@@ -757,10 +718,6 @@ impl<'ctx> Context<'ctx> {
                 types::get_ptr(&ty),
                 rvalue::get_ptr(&rvalue),
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
@@ -778,7 +735,7 @@ impl<'ctx> Context<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_comparison(
                 self.ptr,
                 loc_ptr,
@@ -786,10 +743,6 @@ impl<'ctx> Context<'ctx> {
                 rvalue::get_ptr(&left_rvalue),
                 rvalue::get_ptr(&right_rvalue),
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
@@ -813,7 +766,7 @@ impl<'ctx> Context<'ctx> {
             None => ptr::null_mut(),
         };
         let num_params = args.len() as i32;
-        with_lib(|lib| {
+        with_lib(self, |lib| {
             let mut params_ptrs: Vec<_> =
                 args.iter().map(|x| unsafe { rvalue::get_ptr(x) }).collect();
             unsafe {
@@ -824,10 +777,6 @@ impl<'ctx> Context<'ctx> {
                     num_params,
                     params_ptrs.as_mut_ptr(),
                 );
-                #[cfg(debug_assertions)]
-                if let Ok(Some(error)) = self.get_last_error() {
-                    panic!("{}", error);
-                }
                 rvalue::from_ptr(ptr)
             }
         })
@@ -848,7 +797,7 @@ impl<'ctx> Context<'ctx> {
             None => ptr::null_mut(),
         };
         let num_params = args.len() as i32;
-        with_lib(|lib| {
+        with_lib(self, |lib| {
             let mut params_ptrs: Vec<_> = args
                 .iter()
                 .map(|x| x.to_rvalue())
@@ -862,10 +811,6 @@ impl<'ctx> Context<'ctx> {
                     num_params,
                     params_ptrs.as_mut_ptr(),
                 );
-                #[cfg(debug_assertions)]
-                if let Ok(Some(error)) = self.get_last_error() {
-                    panic!("{}", error);
-                }
                 rvalue::from_ptr(ptr)
             }
         })
@@ -883,17 +828,13 @@ impl<'ctx> Context<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_cast(
                 self.ptr,
                 loc_ptr,
                 rvalue::get_ptr(&rvalue),
                 types::get_ptr(&dest_type),
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
@@ -910,17 +851,13 @@ impl<'ctx> Context<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_bitcast(
                 self.ptr,
                 loc_ptr,
                 rvalue::get_ptr(&rvalue),
                 types::get_ptr(&dest_type),
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
@@ -939,17 +876,13 @@ impl<'ctx> Context<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_va_arg(
                 self.ptr,
                 loc_ptr,
                 rvalue::get_ptr(&ap),
                 types::get_ptr(&arg_type),
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
@@ -968,30 +901,22 @@ impl<'ctx> Context<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_array_access(
                 self.ptr,
                 loc_ptr,
                 rvalue::get_ptr(&array_rvalue),
                 rvalue::get_ptr(&idx_rvalue),
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             lvalue::from_ptr(ptr)
         })
     }
 
     /// Creates a new RValue from a given long value.
     pub fn new_rvalue_from_long<'a>(&'a self, ty: types::Type<'a>, value: i64) -> RValue<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr =
                 lib.gcc_jit_context_new_rvalue_from_long(self.ptr, types::get_ptr(&ty), value as _);
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
@@ -1002,7 +927,7 @@ impl<'ctx> Context<'ctx> {
         vec_type: types::Type<'a>,
         elements: &[RValue<'a>],
     ) -> RValue<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
@@ -1014,10 +939,6 @@ impl<'ctx> Context<'ctx> {
                 elements.len() as _,
                 elements.as_ptr() as *mut *mut _,
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
@@ -1030,7 +951,7 @@ impl<'ctx> Context<'ctx> {
         elements2: RValue<'a>,
         mask: RValue<'a>,
     ) -> RValue<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
@@ -1042,10 +963,6 @@ impl<'ctx> Context<'ctx> {
                 rvalue::get_ptr(&elements2),
                 rvalue::get_ptr(&mask),
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
@@ -1059,7 +976,7 @@ impl<'ctx> Context<'ctx> {
         fields: Option<&[Field<'a>]>,
         values: &[RValue<'a>],
     ) -> RValue<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
@@ -1077,10 +994,6 @@ impl<'ctx> Context<'ctx> {
                 fields_ptr as *mut *mut _,
                 values.as_ptr() as *mut *mut _,
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
@@ -1091,7 +1004,7 @@ impl<'ctx> Context<'ctx> {
         array_type: types::Type<'a>,
         elements: &[RValue<'a>],
     ) -> RValue<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
@@ -1103,10 +1016,6 @@ impl<'ctx> Context<'ctx> {
                 elements.len() as _,
                 elements.as_ptr() as *mut *mut _,
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
@@ -1118,7 +1027,7 @@ impl<'ctx> Context<'ctx> {
         vector: RValue<'a>,
         index: RValue<'a>,
     ) -> LValue<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
@@ -1130,10 +1039,6 @@ impl<'ctx> Context<'ctx> {
                 rvalue::get_ptr(&vector),
                 rvalue::get_ptr(&index),
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             lvalue::from_ptr(ptr)
         })
     }
@@ -1145,7 +1050,7 @@ impl<'ctx> Context<'ctx> {
         vector: RValue<'a>,
         type_: Type<'a>,
     ) -> RValue<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
@@ -1156,59 +1061,39 @@ impl<'ctx> Context<'ctx> {
                 rvalue::get_ptr(&vector),
                 types::get_ptr(&type_),
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
 
     /// Creates a new RValue from a given int value.
     pub fn new_rvalue_from_int<'a>(&'a self, ty: types::Type<'a>, value: i32) -> RValue<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_rvalue_from_int(self.ptr, types::get_ptr(&ty), value);
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
 
     /// Creates a new RValue from a given double value.
     pub fn new_rvalue_from_double<'a>(&'a self, ty: types::Type<'a>, value: f64) -> RValue<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr =
                 lib.gcc_jit_context_new_rvalue_from_double(self.ptr, types::get_ptr(&ty), value);
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
 
     /// Creates a zero element for a given type.
     pub fn new_rvalue_zero<'a>(&'a self, ty: types::Type<'a>) -> RValue<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_zero(self.ptr, types::get_ptr(&ty));
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
 
     /// Creates a one element for a given type.
     pub fn new_rvalue_one<'a>(&'a self, ty: types::Type<'a>) -> RValue<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_one(self.ptr, types::get_ptr(&ty));
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
@@ -1218,41 +1103,29 @@ impl<'ctx> Context<'ctx> {
     /// than that of the jitted program.
     #[allow(clippy::not_unsafe_ptr_arg_deref)]
     pub fn new_rvalue_from_ptr<'a>(&'a self, ty: types::Type<'a>, value: *mut ()) -> RValue<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_rvalue_from_ptr(
                 self.ptr,
                 types::get_ptr(&ty),
                 mem::transmute::<*mut (), *mut c_void>(value),
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
 
     /// Creates a null RValue.
     pub fn new_null<'a>(&'a self, ty: types::Type<'a>) -> RValue<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_null(self.ptr, types::get_ptr(&ty));
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
 
     /// Creates a string literal RValue.
     pub fn new_string_literal<'a, S: AsRef<str>>(&'a self, value: S) -> RValue<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let cstr = CString::new(value.as_ref()).unwrap();
             let ptr = lib.gcc_jit_context_new_string_literal(self.ptr, cstr.as_ptr());
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
@@ -1260,12 +1133,8 @@ impl<'ctx> Context<'ctx> {
     #[cfg(feature = "master")]
     /// Creates a new RValue from a sizeof(type).
     pub fn new_sizeof<'a>(&'a self, ty: types::Type<'a>) -> RValue<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_sizeof(self.ptr, types::get_ptr(&ty));
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
@@ -1273,12 +1142,8 @@ impl<'ctx> Context<'ctx> {
     #[cfg(feature = "master")]
     /// Creates a new RValue from a _Alignof(type).
     pub fn new_alignof<'a>(&'a self, ty: types::Type<'a>) -> RValue<'a> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_alignof(self.ptr, types::get_ptr(&ty));
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             rvalue::from_ptr(ptr)
         })
     }
@@ -1287,7 +1152,7 @@ impl<'ctx> Context<'ctx> {
     /// of API calls. You should only ever need to call this if you are debugging
     /// an issue in gccjit itself or this library.
     pub fn dump_reproducer_to_file<S: AsRef<str>>(&self, path: S) {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let path_ref = path.as_ref();
             let cstr = CString::new(path_ref).unwrap();
             lib.gcc_jit_context_dump_reproducer_to_file(self.ptr, cstr.as_ptr());
@@ -1295,7 +1160,7 @@ impl<'ctx> Context<'ctx> {
     }
 
     pub fn dump_to_file<S: AsRef<str>>(&self, path: S, update_locations: bool) {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let path_ref = path.as_ref();
             let cstr = CString::new(path_ref).unwrap();
             lib.gcc_jit_context_dump_to_file(self.ptr, cstr.as_ptr(), update_locations as c_int);
@@ -1314,7 +1179,7 @@ impl<'ctx> Context<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let cstr = CString::new(name_ref).unwrap();
             let ptr = lib.gcc_jit_context_new_param(
                 self.ptr,
@@ -1322,10 +1187,6 @@ impl<'ctx> Context<'ctx> {
                 types::get_ptr(&ty),
                 cstr.as_ptr(),
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             parameter::from_ptr(ptr)
         })
     }
@@ -1335,13 +1196,9 @@ impl<'ctx> Context<'ctx> {
     /// for a full list.
     pub fn get_builtin_function<'a, S: AsRef<str>>(&'a self, name: S) -> Function<'a> {
         let name_ref = name.as_ref();
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let cstr = CString::new(name_ref).unwrap();
             let ptr = lib.gcc_jit_context_get_builtin_function(self.ptr, cstr.as_ptr());
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             function::from_ptr(ptr)
         })
     }
@@ -1352,19 +1209,15 @@ impl<'ctx> Context<'ctx> {
     /// for a full list.
     pub fn get_target_builtin_function<'a, S: AsRef<str>>(&'a self, name: S) -> Function<'a> {
         let name_ref = name.as_ref();
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let cstr = CString::new(name_ref).unwrap();
             let ptr = lib.gcc_jit_context_get_target_builtin_function(self.ptr, cstr.as_ptr());
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.get_last_error() {
-                panic!("{}", error);
-            }
             function::from_ptr(ptr)
         })
     }
 
     pub fn get_first_error(&self) -> Result<Option<&'ctx str>, Utf8Error> {
-        with_lib(|lib| unsafe {
+        with_lib_without_error_check(|lib| unsafe {
             let str = lib.gcc_jit_context_get_first_error(self.ptr);
             if str.is_null() {
                 Ok(None)
@@ -1375,7 +1228,7 @@ impl<'ctx> Context<'ctx> {
     }
 
     pub fn get_last_error(&self) -> Result<Option<&'ctx str>, Utf8Error> {
-        with_lib(|lib| unsafe {
+        with_lib_without_error_check(|lib| unsafe {
             let str = lib.gcc_jit_context_get_last_error(self.ptr);
             if str.is_null() {
                 Ok(None)
@@ -1393,7 +1246,7 @@ impl<'ctx> Context<'ctx> {
             static stderr: *mut c_void;
         }
 
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_context_set_logfile(self.ptr, stderr as *mut _, 0, 0);
         })
     }
@@ -1404,19 +1257,15 @@ impl<'ctx> Context<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_context_add_top_level_asm(self.ptr, loc_ptr, asm_stmts.as_ptr());
         });
-        #[cfg(debug_assertions)]
-        if let Ok(Some(error)) = self.get_last_error() {
-            panic!("{}", error);
-        }
     }
 
     #[cfg(feature = "master")]
     pub fn set_filename(&self, filename: &str) {
         let c_str = CString::new(filename).unwrap();
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_context_set_filename(self.ptr, c_str.as_ptr());
         })
     }
@@ -1424,7 +1273,7 @@ impl<'ctx> Context<'ctx> {
 
 impl<'ctx> Drop for Context<'ctx> {
     fn drop(&mut self) {
-        with_lib(|lib| unsafe {
+        with_lib_without_error_check(|lib| unsafe {
             lib.gcc_jit_context_release(self.ptr);
         })
     }

@@ -12,7 +12,7 @@ use object::{Object, ToObject};
 use rvalue;
 use rvalue::{RValue, ToRValue};
 
-use crate::with_lib;
+use crate::{with_lib, with_lib_without_error_check};
 
 #[cfg(feature = "master")]
 #[derive(Clone, Copy, Debug)]
@@ -133,7 +133,15 @@ pub trait ToLValue<'ctx> {
 
 impl<'ctx> ToObject<'ctx> for LValue<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        with_lib(|lib| unsafe { object::from_ptr(lib.gcc_jit_lvalue_as_object(self.ptr)) })
+        with_lib_without_error_check(|lib| unsafe {
+            object::from_ptr(lib.gcc_jit_lvalue_as_object(self.ptr))
+        })
+    }
+}
+
+impl<'ctx> crate::ContextGetter<'ctx> for LValue<'ctx> {
+    fn context(&self) -> crate::ContextRef<'ctx> {
+        self.to_object().context()
     }
 }
 
@@ -152,7 +160,7 @@ impl<'ctx> ToLValue<'ctx> for LValue<'ctx> {
 
 impl<'ctx> ToRValue<'ctx> for LValue<'ctx> {
     fn to_rvalue(&self) -> RValue<'ctx> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_lvalue_as_rvalue(self.ptr);
             rvalue::from_ptr(ptr)
         })
@@ -167,7 +175,7 @@ impl<'ctx> LValue<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_lvalue_access_field(self.ptr, loc_ptr, field::get_ptr(&field));
             from_ptr(ptr)
         })
@@ -179,7 +187,7 @@ impl<'ctx> LValue<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_lvalue_get_address(self.ptr, loc_ptr);
             rvalue::from_ptr(ptr)
         })
@@ -187,59 +195,61 @@ impl<'ctx> LValue<'ctx> {
 
     /// Set the initialization value for a global variable.
     pub fn global_set_initializer(&self, blob: &[u8]) {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_global_set_initializer(self.ptr, blob.as_ptr() as _, blob.len() as _);
         })
     }
 
     /// Set the initialization value for a global variable.
     pub fn global_set_initializer_rvalue(&self, value: RValue<'ctx>) -> LValue<'ctx> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             from_ptr(lib.gcc_jit_global_set_initializer_rvalue(self.ptr, rvalue::get_ptr(&value)))
         })
     }
 
     pub fn set_tls_model(&self, model: TlsModel) {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_lvalue_set_tls_model(self.ptr, model.to_sys());
         })
     }
 
     pub fn set_link_section(&self, name: &str) {
         let name = CString::new(name).unwrap();
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_lvalue_set_link_section(self.ptr, name.as_ptr());
         })
     }
 
     #[cfg(feature = "master")]
     pub fn global_set_readonly(&self) {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_global_set_readonly(self.ptr);
         })
     }
 
     pub fn set_register_name(&self, reg_name: &str) {
         let name = CString::new(reg_name).unwrap();
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_lvalue_set_register_name(self.ptr, name.as_ptr());
         })
     }
 
     pub fn set_alignment(&self, alignment: i32) {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_lvalue_set_alignment(self.ptr, alignment);
         })
     }
 
     pub fn get_alignment(&self) -> i32 {
-        with_lib(|lib| unsafe { lib.gcc_jit_lvalue_get_alignment(self.ptr) })
+        with_lib(self, |lib| unsafe {
+            lib.gcc_jit_lvalue_get_alignment(self.ptr)
+        })
     }
 
     #[cfg(feature = "master")]
     pub fn add_attribute(&self, attribute: VarAttribute) {
         let value = attribute.get_value();
-        with_lib(|lib| match value {
+        with_lib(self, |lib| match value {
             AttributeValue::Int(_) => unimplemented!(),
             AttributeValue::IntArray(_) => unimplemented!(),
             AttributeValue::None => unsafe {
@@ -260,7 +270,7 @@ impl<'ctx> LValue<'ctx> {
 
     #[cfg(feature = "master")]
     pub fn get_name(&self) -> Option<&'ctx str> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let str = lib.gcc_jit_lvalue_get_name(self.ptr);
             if str.is_null() {
                 None
@@ -277,7 +287,7 @@ impl<'ctx> LValue<'ctx> {
     #[cfg(feature = "master")]
     pub fn set_name(&self, new_name: &str) {
         let new_name = CString::new(new_name).unwrap();
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_lvalue_set_name(self.ptr, new_name.as_ptr());
         })
     }

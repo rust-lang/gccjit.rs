@@ -23,7 +23,7 @@ pub struct Struct<'ctx> {
 
 impl<'ctx> Struct<'ctx> {
     pub fn as_type(&self) -> Type<'ctx> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_struct_as_type(self.ptr);
             types::from_ptr(ptr)
         })
@@ -35,7 +35,7 @@ impl<'ctx> Struct<'ctx> {
             None => ptr::null_mut(),
         };
         let num_fields = fields.len() as i32;
-        with_lib(|lib| {
+        with_lib(self, |lib| {
             let mut fields_ptrs: Vec<_> = fields
                 .iter()
                 .map(|x| unsafe { field::get_ptr(x) })
@@ -49,35 +49,22 @@ impl<'ctx> Struct<'ctx> {
                 );
             }
         });
-        #[cfg(debug_assertions)]
-        if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-            panic!("{}", error);
-        }
     }
 
     pub fn get_field(&self, index: i32) -> Field<'ctx> {
-        let field = with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_struct_get_field(self.ptr, index);
             #[cfg(debug_assertions)]
             if ptr.is_null() {
                 panic!("Null ptr in get_field() from struct: {:?}", self);
             }
             field::from_ptr(ptr)
-        });
-        #[cfg(debug_assertions)]
-        if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-            panic!("{}", error);
-        }
-        field
+        })
     }
 
     pub fn get_field_count(&self) -> usize {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let count = lib.gcc_jit_struct_get_field_count(self.ptr) as usize;
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-                panic!("{}", error);
-            }
             count
         })
     }
@@ -87,6 +74,12 @@ impl<'ctx> ToObject<'ctx> for Struct<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
         let ty = self.as_type();
         ty.to_object()
+    }
+}
+
+impl<'ctx> crate::ContextGetter<'ctx> for Struct<'ctx> {
+    fn context(&self) -> crate::ContextRef<'ctx> {
+        self.to_object().context()
     }
 }
 

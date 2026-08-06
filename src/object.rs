@@ -17,7 +17,7 @@ pub struct Object<'ctx> {
 
 impl<'ctx> fmt::Debug for Object<'ctx> {
     fn fmt<'a>(&self, fmt: &mut fmt::Formatter<'a>) -> Result<(), fmt::Error> {
-        let rust_str = with_lib(|lib| unsafe {
+        let rust_str = with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_object_get_debug_string(self.ptr);
             let cstr = CStr::from_ptr(ptr);
             str::from_utf8_unchecked(cstr.to_bytes())
@@ -26,12 +26,18 @@ impl<'ctx> fmt::Debug for Object<'ctx> {
     }
 }
 
+impl<'ctx> crate::ContextGetter<'ctx> for Object<'ctx> {
+    fn context(&self) -> ContextRef<'ctx> {
+        self.get_context()
+    }
+}
+
 use std::mem::ManuallyDrop;
 use std::ops::Deref;
 
 #[derive(Debug)]
 pub struct ContextRef<'ctx> {
-    context: ManuallyDrop<Context<'ctx>>,
+    pub(crate) context: ManuallyDrop<Context<'ctx>>,
 }
 
 impl<'ctx> Deref for ContextRef<'ctx> {
@@ -44,7 +50,7 @@ impl<'ctx> Deref for ContextRef<'ctx> {
 
 impl<'ctx> Object<'ctx> {
     pub fn get_context(&self) -> ContextRef<'ctx> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             ContextRef {
                 context: ManuallyDrop::new(context::from_ptr(
                     lib.gcc_jit_object_get_context(self.ptr),

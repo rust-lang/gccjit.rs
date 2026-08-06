@@ -2,7 +2,7 @@ use std::ffi::CString;
 use std::marker::PhantomData;
 use std::os::raw::c_int;
 
-use crate::with_lib;
+use crate::{with_lib, with_lib_without_error_check};
 
 use {lvalue, object, rvalue, Context, LValue, Object, RValue, ToObject};
 
@@ -14,22 +14,28 @@ pub struct ExtendedAsm<'ctx> {
 
 impl<'ctx> ToObject<'ctx> for ExtendedAsm<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        with_lib(|lib| unsafe {
+        with_lib_without_error_check(|lib| unsafe {
             let ptr = lib.gcc_jit_extended_asm_as_object(self.ptr);
             object::from_ptr(ptr)
         })
     }
 }
 
+impl<'ctx> crate::ContextGetter<'ctx> for ExtendedAsm<'ctx> {
+    fn context(&self) -> crate::ContextRef<'ctx> {
+        self.to_object().context()
+    }
+}
+
 impl<'ctx> ExtendedAsm<'ctx> {
     pub fn set_volatile_flag(&self, flag: bool) {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_extended_asm_set_volatile_flag(self.ptr, flag as c_int);
         })
     }
 
     pub fn set_inline_flag(&self, flag: bool) {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_extended_asm_set_inline_flag(self.ptr, flag as c_int);
         })
     }
@@ -46,7 +52,7 @@ impl<'ctx> ExtendedAsm<'ctx> {
             None => std::ptr::null_mut(),
         };
         let constraint = CString::new(constraint).unwrap();
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_extended_asm_add_output_operand(
                 self.ptr,
                 asm_symbolic_name,
@@ -68,7 +74,7 @@ impl<'ctx> ExtendedAsm<'ctx> {
             None => std::ptr::null_mut(),
         };
         let constraint = CString::new(constraint).unwrap();
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_extended_asm_add_input_operand(
                 self.ptr,
                 asm_symbolic_name,
@@ -80,7 +86,7 @@ impl<'ctx> ExtendedAsm<'ctx> {
 
     pub fn add_clobber(&self, victim: &str) {
         let victim = CString::new(victim).unwrap();
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_extended_asm_add_clobber(self.ptr, victim.as_ptr());
         })
     }

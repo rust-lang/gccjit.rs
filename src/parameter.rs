@@ -8,7 +8,7 @@ use rvalue::{RValue, ToRValue};
 use std::fmt;
 use std::marker::PhantomData;
 
-use crate::with_lib;
+use crate::{with_lib, with_lib_without_error_check};
 
 /// Parameter represents a parameter to a function. A series of parameteres
 /// can be combined to form a function signature.
@@ -20,7 +20,15 @@ pub struct Parameter<'ctx> {
 
 impl<'ctx> ToObject<'ctx> for Parameter<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        with_lib(|lib| unsafe { object::from_ptr(lib.gcc_jit_param_as_object(self.ptr)) })
+        with_lib_without_error_check(|lib| unsafe {
+            object::from_ptr(lib.gcc_jit_param_as_object(self.ptr))
+        })
+    }
+}
+
+impl<'ctx> crate::ContextGetter<'ctx> for Parameter<'ctx> {
+    fn context(&self) -> crate::ContextRef<'ctx> {
+        self.to_object().context()
     }
 }
 
@@ -33,7 +41,7 @@ impl<'ctx> fmt::Debug for Parameter<'ctx> {
 
 impl<'ctx> ToRValue<'ctx> for Parameter<'ctx> {
     fn to_rvalue(&self) -> RValue<'ctx> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_param_as_rvalue(self.ptr);
             rvalue::from_ptr(ptr)
         })
@@ -42,7 +50,7 @@ impl<'ctx> ToRValue<'ctx> for Parameter<'ctx> {
 
 impl<'ctx> ToLValue<'ctx> for Parameter<'ctx> {
     fn to_lvalue(&self) -> LValue<'ctx> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_param_as_lvalue(self.ptr);
             lvalue::from_ptr(ptr)
         })

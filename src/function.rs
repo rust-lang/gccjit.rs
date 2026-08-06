@@ -22,7 +22,7 @@ use std::ffi::CString;
 use types;
 use types::Type;
 
-use crate::with_lib;
+use crate::{with_lib, with_lib_without_error_check};
 
 /// FunctionType informs gccjit what sort of function a new function will be.
 /// An exported function is a function that will be exported using the CompileResult
@@ -220,7 +220,7 @@ pub struct Function<'ctx> {
 
 impl<'ctx> ToObject<'ctx> for Function<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        with_lib(|lib| unsafe {
+        with_lib_without_error_check(|lib| unsafe {
             let ptr = lib.gcc_jit_function_as_object(self.ptr);
             object::from_ptr(ptr)
         })
@@ -234,28 +234,34 @@ impl<'ctx> fmt::Debug for Function<'ctx> {
     }
 }
 
+impl<'ctx> crate::ContextGetter<'ctx> for Function<'ctx> {
+    fn context(&self) -> crate::ContextRef<'ctx> {
+        self.to_object().context()
+    }
+}
+
 impl<'ctx> Function<'ctx> {
     pub fn get_param(&self, idx: i32) -> Parameter<'ctx> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_function_get_param(self.ptr, idx);
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-                panic!("{} ({:?})", error, self);
-            }
             parameter::from_ptr(ptr)
         })
     }
 
     pub fn get_param_count(&self) -> usize {
-        with_lib(|lib| unsafe { lib.gcc_jit_function_get_param_count(self.ptr) as usize })
+        with_lib(self, |lib| unsafe {
+            lib.gcc_jit_function_get_param_count(self.ptr) as usize
+        })
     }
 
     pub fn get_return_type(&self) -> Type<'ctx> {
-        with_lib(|lib| unsafe { types::from_ptr(lib.gcc_jit_function_get_return_type(self.ptr)) })
+        with_lib(self, |lib| unsafe {
+            types::from_ptr(lib.gcc_jit_function_get_return_type(self.ptr))
+        })
     }
 
     pub fn get_address(&self, loc: Option<Location<'ctx>>) -> RValue<'ctx> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
@@ -266,20 +272,16 @@ impl<'ctx> Function<'ctx> {
     }
 
     pub fn dump_to_dot<S: AsRef<str>>(&self, path: S) {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let cstr = CString::new(path.as_ref()).unwrap();
             lib.gcc_jit_function_dump_to_dot(self.ptr, cstr.as_ptr());
         })
     }
 
     pub fn new_block<S: AsRef<str>>(&self, name: S) -> Block<'ctx> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let cstr = CString::new(name.as_ref()).unwrap();
             let ptr = lib.gcc_jit_function_new_block(self.ptr, cstr.as_ptr());
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-                panic!("{} ({:?})", error, self);
-            }
             block::from_ptr(ptr)
         })
     }
@@ -302,7 +304,7 @@ impl<'ctx> Function<'ctx> {
 
     #[cfg(feature = "master")]
     pub fn set_personality_function(&self, personality_func: Function<'ctx>) {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_function_set_personality_function(self.ptr, personality_func.ptr);
         })
     }
@@ -313,7 +315,7 @@ impl<'ctx> Function<'ctx> {
         ty: Type<'ctx>,
         name: S,
     ) -> LValue<'ctx> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
@@ -325,26 +327,18 @@ impl<'ctx> Function<'ctx> {
                 types::get_ptr(&ty),
                 cstr.as_ptr(),
             );
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-                panic!("{} ({:?})", error, self);
-            }
             lvalue::from_ptr(ptr)
         })
     }
 
     #[cfg(feature = "master")]
     pub fn new_temp(&self, loc: Option<Location<'ctx>>, ty: Type<'ctx>) -> LValue<'ctx> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
             };
             let ptr = lib.gcc_jit_function_new_temp(self.ptr, loc_ptr, types::get_ptr(&ty));
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-                panic!("{} ({:?})", error, self);
-            }
             lvalue::from_ptr(ptr)
         })
     }
@@ -352,7 +346,7 @@ impl<'ctx> Function<'ctx> {
     #[cfg(feature = "master")]
     pub fn add_attribute<'a>(&self, attribute: FnAttribute<'a>) {
         let value = attribute.get_value();
-        with_lib(|lib| {
+        with_lib(self, |lib| {
             match value {
                 AttributeValue::Int(value) => {
                     // Basically the same as `IntArray` but for only one element.

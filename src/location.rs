@@ -4,7 +4,7 @@ use object::{Object, ToObject};
 use std::fmt;
 use std::marker::PhantomData;
 
-use crate::with_lib;
+use crate::with_lib_without_error_check;
 
 /// A Location represents a location used when debugging jitted code.
 #[derive(Copy, Clone)]
@@ -15,7 +15,15 @@ pub struct Location<'ctx> {
 
 impl<'ctx> ToObject<'ctx> for Location<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        with_lib(|lib| unsafe { object::from_ptr(lib.gcc_jit_location_as_object(self.ptr)) })
+        with_lib_without_error_check(|lib| unsafe {
+            object::from_ptr(lib.gcc_jit_location_as_object(self.ptr))
+        })
+    }
+}
+
+impl<'ctx> crate::ContextGetter<'ctx> for Location<'ctx> {
+    fn context(&self) -> crate::ContextRef<'ctx> {
+        self.to_object().context()
     }
 }
 

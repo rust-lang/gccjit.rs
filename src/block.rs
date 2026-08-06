@@ -16,7 +16,7 @@ use object::{self, Object, ToObject};
 use region::{self, Region};
 use rvalue::{self, ToRValue};
 
-use crate::with_lib;
+use crate::{with_lib, with_lib_without_error_check};
 
 /// BinaryOp is a enum representing the various binary operations
 /// that gccjit knows how to codegen.
@@ -73,10 +73,16 @@ pub struct Block<'ctx> {
 
 impl<'ctx> ToObject<'ctx> for Block<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        with_lib(|lib| unsafe {
+        with_lib_without_error_check(|lib| unsafe {
             let ptr = lib.gcc_jit_block_as_object(self.ptr);
             object::from_ptr(ptr)
         })
+    }
+}
+
+impl<'ctx> crate::ContextGetter<'ctx> for Block<'ctx> {
+    fn context(&self) -> crate::ContextRef<'ctx> {
+        self.to_object().context()
     }
 }
 
@@ -89,7 +95,7 @@ impl<'ctx> fmt::Debug for Block<'ctx> {
 
 impl<'ctx> Block<'ctx> {
     pub fn get_function(&self) -> Function<'ctx> {
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let ptr = lib.gcc_jit_block_get_function(self.ptr);
             function::from_ptr(ptr)
         })
@@ -113,13 +119,9 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_block_add_eval(self.ptr, loc_ptr, rvalue::get_ptr(&rvalue));
         });
-        #[cfg(debug_assertions)]
-        if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-            panic!("{}", error);
-        }
     }
 
     #[cfg(feature = "master")]
@@ -203,7 +205,7 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_block_add_assignment(
                 self.ptr,
                 loc_ptr,
@@ -211,11 +213,6 @@ impl<'ctx> Block<'ctx> {
                 rvalue::get_ptr(&rvalue),
             );
         });
-
-        #[cfg(debug_assertions)]
-        if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-            panic!("{}", error);
-        }
     }
 
     /// Performs a binary operation on an LValue and an RValue, assigning
@@ -234,7 +231,7 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_block_add_assignment_op(
                 self.ptr,
                 loc_ptr,
@@ -253,7 +250,7 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             let cstr = CString::new(message_ref).unwrap();
             lib.gcc_jit_block_add_comment(self.ptr, loc_ptr, cstr.as_ptr());
         });
@@ -273,7 +270,7 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_block_end_with_conditional(
                 self.ptr,
                 loc_ptr,
@@ -282,10 +279,6 @@ impl<'ctx> Block<'ctx> {
                 on_false.ptr,
             );
         });
-        #[cfg(debug_assertions)]
-        if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-            panic!("{}", error);
-        }
     }
 
     /// Terminates a block by unconditionally jumping to another block.
@@ -294,13 +287,9 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_block_end_with_jump(self.ptr, loc_ptr, target.ptr);
         });
-        #[cfg(debug_assertions)]
-        if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-            panic!("{}", error);
-        }
     }
 
     /// Terminates a block by returning from the containing function, setting
@@ -313,14 +302,9 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_block_end_with_return(self.ptr, loc_ptr, rvalue::get_ptr(&ret_rvalue));
         });
-
-        #[cfg(debug_assertions)]
-        if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-            panic!("{}", error);
-        }
     }
 
     /// Terminates a block by returning from the containing function, returning
@@ -332,13 +316,9 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_block_end_with_void_return(self.ptr, loc_ptr);
         });
-        #[cfg(debug_assertions)]
-        if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-            panic!("{}", error);
-        }
     }
 
     pub fn end_with_switch<T: ToRValue<'ctx>>(
@@ -353,7 +333,7 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_block_end_with_switch(
                 self.ptr,
                 loc_ptr,
@@ -363,10 +343,6 @@ impl<'ctx> Block<'ctx> {
                 cases.as_ptr() as *mut *mut _,
             );
         });
-        #[cfg(debug_assertions)]
-        if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-            panic!("{}", error);
-        }
     }
 
     #[cfg(feature = "master")]
@@ -394,7 +370,7 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             ExtendedAsm::from_ptr(lib.gcc_jit_block_add_extended_asm(
                 self.ptr,
                 loc_ptr,
@@ -419,7 +395,7 @@ impl<'ctx> Block<'ctx> {
             Some(ref block) => unsafe { get_ptr(block) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             ExtendedAsm::from_ptr(lib.gcc_jit_block_end_with_extended_asm_goto(
                 self.ptr,
                 loc_ptr,
