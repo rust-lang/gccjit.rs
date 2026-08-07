@@ -60,6 +60,6 @@ pub unsafe fn from_ptr(ptr: *mut gccjit_sys::gcc_jit_target_info) -> TargetInfo 
     TargetInfo { ptr }
 }
 
-pub unsafe fn get_ptr<'ctx>(target: &TargetInfo) -> *mut gccjit_sys::gcc_jit_target_info {
+pub unsafe fn get_ptr(target: &TargetInfo) -> *mut gccjit_sys::gcc_jit_target_info {
     target.ptr
 }
