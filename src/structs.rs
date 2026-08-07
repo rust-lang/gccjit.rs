@@ -64,8 +64,7 @@ impl<'ctx> Struct<'ctx> {
 
     pub fn get_field_count(&self) -> usize {
         with_lib(self, |lib| unsafe {
-            let count = lib.gcc_jit_struct_get_field_count(self.ptr) as usize;
-            count
+            lib.gcc_jit_struct_get_field_count(self.ptr) as usize
         })
     }
 }
