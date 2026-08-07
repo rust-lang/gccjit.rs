@@ -2,6 +2,7 @@ use context::Context;
 use std::ffi::CStr;
 use std::fmt;
 use std::marker::PhantomData;
+use std::ptr::NonNull;
 use std::str;
 
 use crate::{context, with_lib, with_lib_without_error_check};
@@ -12,13 +13,13 @@ use crate::{context, with_lib, with_lib_without_error_check};
 #[derive(Copy, Clone)]
 pub struct Object<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_object,
+    ptr: NonNull<gccjit_sys::gcc_jit_object>,
 }
 
 impl<'ctx> fmt::Debug for Object<'ctx> {
     fn fmt<'a>(&self, fmt: &mut fmt::Formatter<'a>) -> Result<(), fmt::Error> {
         let rust_str = with_lib(self, |lib| unsafe {
-            let ptr = lib.gcc_jit_object_get_debug_string(self.ptr);
+            let ptr = lib.gcc_jit_object_get_debug_string(get_ptr(self));
             let cstr = CStr::from_ptr(ptr);
             str::from_utf8_unchecked(cstr.to_bytes())
         });
@@ -52,9 +53,10 @@ impl<'ctx> Object<'ctx> {
     pub fn get_context(&self) -> ContextRef<'ctx> {
         with_lib_without_error_check(|lib| unsafe {
             ContextRef {
-                context: ManuallyDrop::new(context::from_ptr(
-                    lib.gcc_jit_object_get_context(self.ptr),
-                )),
+                context: ManuallyDrop::new(
+                    context::from_ptr(lib.gcc_jit_object_get_context(get_ptr(self)))
+                        .expect("Failed to get Context from Object"),
+                ),
             }
         })
     }
@@ -67,17 +69,17 @@ pub trait ToObject<'ctx> {
 
 impl<'ctx> ToObject<'ctx> for Object<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        unsafe { from_ptr(self.ptr) }
+        unsafe { from_ptr(get_ptr(self)).expect("NULL Object") }
     }
 }
 
-pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_object) -> Object<'ctx> {
-    Object {
+pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_object) -> Option<Object<'ctx>> {
+    Some(Object {
         marker: PhantomData,
-        ptr,
-    }
+        ptr: NonNull::new(ptr)?,
+    })
 }
 
 pub unsafe fn get_ptr<'ctx>(object: &Object<'ctx>) -> *mut gccjit_sys::gcc_jit_object {
-    object.ptr
+    object.ptr.as_ptr()
 }

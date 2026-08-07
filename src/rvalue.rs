@@ -12,7 +12,7 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Shr, Sub};
-use std::ptr;
+use std::ptr::{self, NonNull};
 use types;
 use types::Type;
 
@@ -24,7 +24,7 @@ use crate::{with_lib, with_lib_without_error_check};
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct RValue<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_rvalue,
+    ptr: NonNull<gccjit_sys::gcc_jit_rvalue>,
 }
 
 /// ToRValue is a trait implemented by types that can be converted to, or
@@ -36,7 +36,8 @@ pub trait ToRValue<'ctx> {
 impl<'ctx> ToObject<'ctx> for RValue<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
         with_lib_without_error_check(|lib| unsafe {
-            object::from_ptr(lib.gcc_jit_rvalue_as_object(self.ptr))
+            object::from_ptr(lib.gcc_jit_rvalue_as_object(get_ptr(self)))
+                .expect("Failed to get Object from RValue")
         })
     }
 }
@@ -56,7 +57,7 @@ impl<'ctx> fmt::Debug for RValue<'ctx> {
 
 impl<'ctx> ToRValue<'ctx> for RValue<'ctx> {
     fn to_rvalue(&self) -> RValue<'ctx> {
-        unsafe { from_ptr(self.ptr) }
+        unsafe { from_ptr(get_ptr(self)).expect("Failed to convert RValue to RValue") }
     }
 }
 
@@ -70,16 +71,18 @@ macro_rules! binary_operator_for {
                     let rhs_rvalue = rhs.to_rvalue();
                     let obj_ptr = object::get_ptr(&self.to_object());
                     let ctx_ptr = lib.gcc_jit_object_get_context(obj_ptr);
-                    let ty = rhs.get_type();
+                    let ty = rhs
+                        .get_type()
+                        .expect("Failed to get Type to compute RValue");
                     let ptr = lib.gcc_jit_context_new_binary_op(
                         ctx_ptr,
                         ptr::null_mut(),
                         mem::transmute::<BinaryOp, gccjit_sys::gcc_jit_binary_op>($op),
                         types::get_ptr(&ty),
-                        self.ptr,
-                        rhs_rvalue.ptr,
+                        get_ptr(&self),
+                        rhs_rvalue.ptr.as_ptr(),
                     );
-                    from_ptr(ptr)
+                    from_ptr(ptr).expect("Failed to compute RValue")
                 })
             }
         }
@@ -100,9 +103,9 @@ binary_operator_for!(Shr<RValue<'ctx>>, shr, BinaryOp::RShift);
 
 impl<'ctx> RValue<'ctx> {
     /// Gets the type of this RValue.
-    pub fn get_type(&self) -> Type<'ctx> {
+    pub fn get_type(&self) -> Option<Type<'ctx>> {
         with_lib(self, |lib| unsafe {
-            let ptr = lib.gcc_jit_rvalue_get_type(self.ptr);
+            let ptr = lib.gcc_jit_rvalue_get_type(get_ptr(self));
             types::from_ptr(ptr)
         })
     }
@@ -112,7 +115,7 @@ impl<'ctx> RValue<'ctx> {
     pub fn set_location(&self, loc: Location) {
         with_lib(self, |lib| unsafe {
             let loc_ptr = location::get_ptr(&loc);
-            lib.gcc_jit_rvalue_set_location(self.ptr, loc_ptr);
+            lib.gcc_jit_rvalue_set_location(get_ptr(self), loc_ptr);
         })
     }
 
@@ -121,19 +124,24 @@ impl<'ctx> RValue<'ctx> {
     pub fn set_type(&self, typ: Type<'ctx>) {
         with_lib(self, |lib| unsafe {
             let type_ptr = types::get_ptr(&typ);
-            lib.gcc_jit_rvalue_set_type(self.ptr, type_ptr);
+            lib.gcc_jit_rvalue_set_type(get_ptr(self), type_ptr);
         })
     }
 
     /// Given an RValue x and a Field f, returns an RValue representing
     /// C's x.f.
-    pub fn access_field(&self, loc: Option<Location<'ctx>>, field: Field<'ctx>) -> RValue<'ctx> {
+    pub fn access_field(
+        &self,
+        loc: Option<Location<'ctx>>,
+        field: Field<'ctx>,
+    ) -> Option<RValue<'ctx>> {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
         with_lib(self, |lib| unsafe {
-            let ptr = lib.gcc_jit_rvalue_access_field(self.ptr, loc_ptr, field::get_ptr(&field));
+            let ptr =
+                lib.gcc_jit_rvalue_access_field(get_ptr(self), loc_ptr, field::get_ptr(&field));
             from_ptr(ptr)
         })
     }
@@ -144,44 +152,47 @@ impl<'ctx> RValue<'ctx> {
         &self,
         loc: Option<Location<'ctx>>,
         field: Field<'ctx>,
-    ) -> LValue<'ctx> {
+    ) -> Option<LValue<'ctx>> {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
         with_lib(self, |lib| unsafe {
-            let ptr =
-                lib.gcc_jit_rvalue_dereference_field(self.ptr, loc_ptr, field::get_ptr(&field));
+            let ptr = lib.gcc_jit_rvalue_dereference_field(
+                get_ptr(self),
+                loc_ptr,
+                field::get_ptr(&field),
+            );
             lvalue::from_ptr(ptr)
         })
     }
 
     /// Given a RValue x, returns an RValue that represents *x.
-    pub fn dereference(&self, loc: Option<Location<'ctx>>) -> LValue<'ctx> {
+    pub fn dereference(&self, loc: Option<Location<'ctx>>) -> Option<LValue<'ctx>> {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
         with_lib(self, |lib| unsafe {
-            let ptr = lib.gcc_jit_rvalue_dereference(self.ptr, loc_ptr);
+            let ptr = lib.gcc_jit_rvalue_dereference(get_ptr(self), loc_ptr);
             lvalue::from_ptr(ptr)
         })
     }
 
     pub fn set_require_tail_call(&self, require_tail_call: bool) {
         with_lib(self, |lib| unsafe {
-            lib.gcc_jit_rvalue_set_bool_require_tail_call(self.ptr, require_tail_call as _);
+            lib.gcc_jit_rvalue_set_bool_require_tail_call(get_ptr(self), require_tail_call as _);
         })
     }
 }
 
-pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_rvalue) -> RValue<'ctx> {
-    RValue {
+pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_rvalue) -> Option<RValue<'ctx>> {
+    Some(RValue {
         marker: PhantomData,
-        ptr,
-    }
+        ptr: NonNull::new(ptr)?,
+    })
 }
 
 pub unsafe fn get_ptr<'ctx>(rvalue: &RValue<'ctx>) -> *mut gccjit_sys::gcc_jit_rvalue {
-    rvalue.ptr
+    rvalue.ptr.as_ptr()
 }

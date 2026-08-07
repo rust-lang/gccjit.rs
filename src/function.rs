@@ -1,6 +1,6 @@
 use std::fmt;
 use std::marker::PhantomData;
-use std::ptr;
+use std::ptr::{self, NonNull};
 
 use block;
 use block::Block;
@@ -215,14 +215,14 @@ impl<'a> FnAttribute<'a> {
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct Function<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_function,
+    ptr: NonNull<gccjit_sys::gcc_jit_function>,
 }
 
 impl<'ctx> ToObject<'ctx> for Function<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
         with_lib_without_error_check(|lib| unsafe {
-            let ptr = lib.gcc_jit_function_as_object(self.ptr);
-            object::from_ptr(ptr)
+            let ptr = lib.gcc_jit_function_as_object(get_ptr(self));
+            object::from_ptr(ptr).expect("Failed to get Object from Function")
         })
     }
 }
@@ -241,32 +241,32 @@ impl<'ctx> crate::ContextGetter<'ctx> for Function<'ctx> {
 }
 
 impl<'ctx> Function<'ctx> {
-    pub fn get_param(&self, idx: i32) -> Parameter<'ctx> {
+    pub fn get_param(&self, idx: i32) -> Option<Parameter<'ctx>> {
         with_lib(self, |lib| unsafe {
-            let ptr = lib.gcc_jit_function_get_param(self.ptr, idx);
+            let ptr = lib.gcc_jit_function_get_param(get_ptr(self), idx);
             parameter::from_ptr(ptr)
         })
     }
 
     pub fn get_param_count(&self) -> usize {
         with_lib(self, |lib| unsafe {
-            lib.gcc_jit_function_get_param_count(self.ptr) as usize
+            lib.gcc_jit_function_get_param_count(get_ptr(self)) as usize
         })
     }
 
-    pub fn get_return_type(&self) -> Type<'ctx> {
+    pub fn get_return_type(&self) -> Option<Type<'ctx>> {
         with_lib(self, |lib| unsafe {
-            types::from_ptr(lib.gcc_jit_function_get_return_type(self.ptr))
+            types::from_ptr(lib.gcc_jit_function_get_return_type(get_ptr(self)))
         })
     }
 
-    pub fn get_address(&self, loc: Option<Location<'ctx>>) -> RValue<'ctx> {
+    pub fn get_address(&self, loc: Option<Location<'ctx>>) -> Option<RValue<'ctx>> {
         with_lib(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
             };
-            let ptr = lib.gcc_jit_function_get_address(self.ptr, loc_ptr);
+            let ptr = lib.gcc_jit_function_get_address(get_ptr(self), loc_ptr);
             rvalue::from_ptr(ptr)
         })
     }
@@ -274,14 +274,14 @@ impl<'ctx> Function<'ctx> {
     pub fn dump_to_dot<S: AsRef<str>>(&self, path: S) {
         with_lib(self, |lib| unsafe {
             let cstr = CString::new(path.as_ref()).unwrap();
-            lib.gcc_jit_function_dump_to_dot(self.ptr, cstr.as_ptr());
+            lib.gcc_jit_function_dump_to_dot(get_ptr(self), cstr.as_ptr());
         })
     }
 
-    pub fn new_block<S: AsRef<str>>(&self, name: S) -> Block<'ctx> {
+    pub fn new_block<S: AsRef<str>>(&self, name: S) -> Option<Block<'ctx>> {
         with_lib(self, |lib| unsafe {
             let cstr = CString::new(name.as_ref()).unwrap();
-            let ptr = lib.gcc_jit_function_new_block(self.ptr, cstr.as_ptr());
+            let ptr = lib.gcc_jit_function_new_block(get_ptr(self), cstr.as_ptr());
             block::from_ptr(ptr)
         })
     }
@@ -305,7 +305,10 @@ impl<'ctx> Function<'ctx> {
     #[cfg(feature = "master")]
     pub fn set_personality_function(&self, personality_func: Function<'ctx>) {
         with_lib(self, |lib| unsafe {
-            lib.gcc_jit_function_set_personality_function(self.ptr, personality_func.ptr);
+            lib.gcc_jit_function_set_personality_function(
+                get_ptr(self),
+                get_ptr(&personality_func),
+            );
         })
     }
 
@@ -314,7 +317,7 @@ impl<'ctx> Function<'ctx> {
         loc: Option<Location<'ctx>>,
         ty: Type<'ctx>,
         name: S,
-    ) -> LValue<'ctx> {
+    ) -> Option<LValue<'ctx>> {
         with_lib(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
@@ -322,7 +325,7 @@ impl<'ctx> Function<'ctx> {
             };
             let cstr = CString::new(name.as_ref()).unwrap();
             let ptr = lib.gcc_jit_function_new_local(
-                self.ptr,
+                get_ptr(self),
                 loc_ptr,
                 types::get_ptr(&ty),
                 cstr.as_ptr(),
@@ -332,13 +335,13 @@ impl<'ctx> Function<'ctx> {
     }
 
     #[cfg(feature = "master")]
-    pub fn new_temp(&self, loc: Option<Location<'ctx>>, ty: Type<'ctx>) -> LValue<'ctx> {
+    pub fn new_temp(&self, loc: Option<Location<'ctx>>, ty: Type<'ctx>) -> Option<LValue<'ctx>> {
         with_lib(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
             };
-            let ptr = lib.gcc_jit_function_new_temp(self.ptr, loc_ptr, types::get_ptr(&ty));
+            let ptr = lib.gcc_jit_function_new_temp(get_ptr(self), loc_ptr, types::get_ptr(&ty));
             lvalue::from_ptr(ptr)
         })
     }
@@ -353,7 +356,7 @@ impl<'ctx> Function<'ctx> {
                     let value = &[value];
                     unsafe {
                         lib.gcc_jit_function_add_integer_array_attribute(
-                            self.ptr,
+                            get_ptr(self),
                             attribute.as_sys(),
                             value.as_ptr(),
                             value.len() as _,
@@ -362,20 +365,20 @@ impl<'ctx> Function<'ctx> {
                 }
                 AttributeValue::IntArray(value) => unsafe {
                     lib.gcc_jit_function_add_integer_array_attribute(
-                        self.ptr,
+                        get_ptr(self),
                         attribute.as_sys(),
                         value.as_ptr(),
                         value.len() as _,
                     );
                 },
                 AttributeValue::None => unsafe {
-                    lib.gcc_jit_function_add_attribute(self.ptr, attribute.as_sys());
+                    lib.gcc_jit_function_add_attribute(get_ptr(self), attribute.as_sys());
                 },
                 AttributeValue::String(string) => {
                     let cstr = CString::new(string).unwrap();
                     unsafe {
                         lib.gcc_jit_function_add_string_attribute(
-                            self.ptr,
+                            get_ptr(self),
                             attribute.as_sys(),
                             cstr.as_ptr(),
                         );
@@ -386,13 +389,13 @@ impl<'ctx> Function<'ctx> {
     }
 }
 
-pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_function) -> Function<'ctx> {
-    Function {
+pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_function) -> Option<Function<'ctx>> {
+    Some(Function {
         marker: PhantomData,
-        ptr,
-    }
+        ptr: NonNull::new(ptr)?,
+    })
 }
 
 pub unsafe fn get_ptr<'ctx>(loc: &Function<'ctx>) -> *mut gccjit_sys::gcc_jit_function {
-    loc.ptr
+    loc.ptr.as_ptr()
 }

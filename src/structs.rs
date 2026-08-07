@@ -1,6 +1,6 @@
 use std::fmt;
 use std::marker::PhantomData;
-use std::ptr;
+use std::ptr::{self, NonNull};
 
 use context::Context;
 use field;
@@ -18,13 +18,13 @@ use crate::{with_lib, with_lib_without_error_check};
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct Struct<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_struct,
+    ptr: NonNull<gccjit_sys::gcc_jit_struct>,
 }
 
 impl<'ctx> Struct<'ctx> {
-    pub fn as_type(&self) -> Type<'ctx> {
+    pub fn as_type(&self) -> Option<Type<'ctx>> {
         with_lib_without_error_check(|lib| unsafe {
-            let ptr = lib.gcc_jit_struct_as_type(self.ptr);
+            let ptr = lib.gcc_jit_struct_as_type(get_ptr(self));
             types::from_ptr(ptr)
         })
     }
@@ -42,7 +42,7 @@ impl<'ctx> Struct<'ctx> {
                 .collect();
             unsafe {
                 lib.gcc_jit_struct_set_fields(
-                    self.ptr,
+                    get_ptr(self),
                     loc_ptr,
                     num_fields,
                     fields_ptrs.as_mut_ptr(),
@@ -51,9 +51,9 @@ impl<'ctx> Struct<'ctx> {
         });
     }
 
-    pub fn get_field(&self, index: i32) -> Field<'ctx> {
+    pub fn get_field(&self, index: i32) -> Option<Field<'ctx>> {
         with_lib(self, |lib| unsafe {
-            let ptr = lib.gcc_jit_struct_get_field(self.ptr, index);
+            let ptr = lib.gcc_jit_struct_get_field(get_ptr(self), index);
             #[cfg(debug_assertions)]
             if ptr.is_null() {
                 panic!("Null ptr in get_field() from struct: {:?}", self);
@@ -64,14 +64,14 @@ impl<'ctx> Struct<'ctx> {
 
     pub fn get_field_count(&self) -> usize {
         with_lib(self, |lib| unsafe {
-            lib.gcc_jit_struct_get_field_count(self.ptr) as usize
+            lib.gcc_jit_struct_get_field_count(get_ptr(self)) as usize
         })
     }
 }
 
 impl<'ctx> ToObject<'ctx> for Struct<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        let ty = self.as_type();
+        let ty = self.as_type().expect("Failed Struct to Type conversion");
         ty.to_object()
     }
 }
@@ -89,9 +89,13 @@ impl<'ctx> fmt::Debug for Struct<'ctx> {
     }
 }
 
-pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_struct) -> Struct<'ctx> {
-    Struct {
+pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_struct) -> Option<Struct<'ctx>> {
+    Some(Struct {
         marker: PhantomData,
-        ptr,
-    }
+        ptr: NonNull::new(ptr)?,
+    })
+}
+
+pub unsafe fn get_ptr<'ctx>(s: &Struct<'ctx>) -> *mut gccjit_sys::gcc_jit_struct {
+    s.ptr.as_ptr()
 }

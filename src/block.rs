@@ -3,7 +3,7 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::mem;
 use std::os::raw::c_int;
-use std::ptr;
+use std::ptr::{self, NonNull};
 
 use asm::ExtendedAsm;
 use block;
@@ -68,14 +68,14 @@ pub enum ComparisonOp {
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct Block<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
-    ptr: *mut gccjit_sys::gcc_jit_block,
+    ptr: NonNull<gccjit_sys::gcc_jit_block>,
 }
 
 impl<'ctx> ToObject<'ctx> for Block<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
         with_lib_without_error_check(|lib| unsafe {
-            let ptr = lib.gcc_jit_block_as_object(self.ptr);
-            object::from_ptr(ptr)
+            let ptr = lib.gcc_jit_block_as_object(get_ptr(self));
+            object::from_ptr(ptr).expect("Failed to get Object from Block")
         })
     }
 }
@@ -94,9 +94,9 @@ impl<'ctx> fmt::Debug for Block<'ctx> {
 }
 
 impl<'ctx> Block<'ctx> {
-    pub fn get_function(&self) -> Function<'ctx> {
+    pub fn get_function(&self) -> Option<Function<'ctx>> {
         with_lib(self, |lib| unsafe {
-            let ptr = lib.gcc_jit_block_get_function(self.ptr);
+            let ptr = lib.gcc_jit_block_get_function(get_ptr(self));
             function::from_ptr(ptr)
         })
     }
@@ -120,7 +120,7 @@ impl<'ctx> Block<'ctx> {
             None => ptr::null_mut(),
         };
         with_lib(self, |lib| unsafe {
-            lib.gcc_jit_block_add_eval(self.ptr, loc_ptr, rvalue::get_ptr(&rvalue));
+            lib.gcc_jit_block_add_eval(get_ptr(self), loc_ptr, rvalue::get_ptr(&rvalue));
         });
     }
 
@@ -137,7 +137,7 @@ impl<'ctx> Block<'ctx> {
         };
         with_lib(|lib| unsafe {
             lib.gcc_jit_block_add_try_catch(
-                self.ptr,
+                get_ptr(self.ptr),
                 loc_ptr,
                 region::get_ptr(&try_region),
                 region::get_ptr(&catch_region),
@@ -158,7 +158,7 @@ impl<'ctx> Block<'ctx> {
         };
         with_lib(|lib| unsafe {
             lib.gcc_jit_block_add_try_finally(
-                self.ptr,
+                get_ptr(self.ptr),
                 loc_ptr,
                 region::get_ptr(&try_region),
                 region::get_ptr(&finally_region),
@@ -207,7 +207,7 @@ impl<'ctx> Block<'ctx> {
         };
         with_lib(self, |lib| unsafe {
             lib.gcc_jit_block_add_assignment(
-                self.ptr,
+                get_ptr(self),
                 loc_ptr,
                 lvalue::get_ptr(&lvalue),
                 rvalue::get_ptr(&rvalue),
@@ -233,7 +233,7 @@ impl<'ctx> Block<'ctx> {
         };
         with_lib(self, |lib| unsafe {
             lib.gcc_jit_block_add_assignment_op(
-                self.ptr,
+                get_ptr(self),
                 loc_ptr,
                 lvalue::get_ptr(&lvalue),
                 mem::transmute::<BinaryOp, gccjit_sys::gcc_jit_binary_op>(op),
@@ -252,7 +252,7 @@ impl<'ctx> Block<'ctx> {
         };
         with_lib(self, |lib| unsafe {
             let cstr = CString::new(message_ref).unwrap();
-            lib.gcc_jit_block_add_comment(self.ptr, loc_ptr, cstr.as_ptr());
+            lib.gcc_jit_block_add_comment(get_ptr(self), loc_ptr, cstr.as_ptr());
         });
     }
 
@@ -272,11 +272,11 @@ impl<'ctx> Block<'ctx> {
         };
         with_lib(self, |lib| unsafe {
             lib.gcc_jit_block_end_with_conditional(
-                self.ptr,
+                get_ptr(self),
                 loc_ptr,
                 rvalue::get_ptr(&cond_rvalue),
-                on_true.ptr,
-                on_false.ptr,
+                get_ptr(&on_true),
+                get_ptr(&on_false),
             );
         });
     }
@@ -288,7 +288,7 @@ impl<'ctx> Block<'ctx> {
             None => ptr::null_mut(),
         };
         with_lib(self, |lib| unsafe {
-            lib.gcc_jit_block_end_with_jump(self.ptr, loc_ptr, target.ptr);
+            lib.gcc_jit_block_end_with_jump(get_ptr(self), loc_ptr, get_ptr(&target));
         });
     }
 
@@ -303,7 +303,7 @@ impl<'ctx> Block<'ctx> {
             None => ptr::null_mut(),
         };
         with_lib(self, |lib| unsafe {
-            lib.gcc_jit_block_end_with_return(self.ptr, loc_ptr, rvalue::get_ptr(&ret_rvalue));
+            lib.gcc_jit_block_end_with_return(get_ptr(self), loc_ptr, rvalue::get_ptr(&ret_rvalue));
         });
     }
 
@@ -317,7 +317,7 @@ impl<'ctx> Block<'ctx> {
             None => ptr::null_mut(),
         };
         with_lib(self, |lib| unsafe {
-            lib.gcc_jit_block_end_with_void_return(self.ptr, loc_ptr);
+            lib.gcc_jit_block_end_with_void_return(get_ptr(self), loc_ptr);
         });
     }
 
@@ -335,7 +335,7 @@ impl<'ctx> Block<'ctx> {
         };
         with_lib(self, |lib| unsafe {
             lib.gcc_jit_block_end_with_switch(
-                self.ptr,
+                get_ptr(self),
                 loc_ptr,
                 rvalue::get_ptr(&expr),
                 block::get_ptr(&default_block),
@@ -364,7 +364,7 @@ impl<'ctx> Block<'ctx> {
         &self,
         loc: Option<Location<'ctx>>,
         asm_template: &str,
-    ) -> ExtendedAsm<'ctx> {
+    ) -> Option<ExtendedAsm<'ctx>> {
         let asm_template = CString::new(asm_template).unwrap();
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
@@ -372,7 +372,7 @@ impl<'ctx> Block<'ctx> {
         };
         with_lib(self, |lib| unsafe {
             ExtendedAsm::from_ptr(lib.gcc_jit_block_add_extended_asm(
-                self.ptr,
+                get_ptr(self),
                 loc_ptr,
                 asm_template.as_ptr(),
             ))
@@ -385,7 +385,7 @@ impl<'ctx> Block<'ctx> {
         asm_template: &str,
         goto_blocks: &[Block<'ctx>],
         fallthrough_block: Option<Block<'ctx>>,
-    ) -> ExtendedAsm<'ctx> {
+    ) -> Option<ExtendedAsm<'ctx>> {
         let asm_template = CString::new(asm_template).unwrap();
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
@@ -397,7 +397,7 @@ impl<'ctx> Block<'ctx> {
         };
         with_lib(self, |lib| unsafe {
             ExtendedAsm::from_ptr(lib.gcc_jit_block_end_with_extended_asm_goto(
-                self.ptr,
+                get_ptr(self),
                 loc_ptr,
                 asm_template.as_ptr(),
                 goto_blocks.len() as c_int,
@@ -426,13 +426,13 @@ pub fn clone_blocks<'ctx>(blocks: &[Block<'ctx>]) -> Vec<Block<'ctx>> {
     })
 }
 
-pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_block) -> Block<'ctx> {
-    Block {
+pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_block) -> Option<Block<'ctx>> {
+    Some(Block {
         marker: PhantomData,
-        ptr,
-    }
+        ptr: NonNull::new(ptr)?,
+    })
 }
 
 pub unsafe fn get_ptr<'ctx>(block: &Block<'ctx>) -> *mut gccjit_sys::gcc_jit_block {
-    block.ptr
+    block.ptr.as_ptr()
 }

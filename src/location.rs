@@ -16,7 +16,8 @@ pub struct Location<'ctx> {
 impl<'ctx> ToObject<'ctx> for Location<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
         with_lib_without_error_check(|lib| unsafe {
-            object::from_ptr(lib.gcc_jit_location_as_object(self.ptr))
+            object::from_ptr(lib.gcc_jit_location_as_object(get_ptr(self)))
+                .expect("Failed to get Object from Location")
         })
     }
 }

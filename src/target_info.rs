@@ -26,13 +26,13 @@ impl TargetInfo {
             Err(_) => return false,
         };
         with_lib_without_error_check(|lib| unsafe {
-            lib.gcc_jit_target_info_cpu_supports(self.ptr, feature.as_ptr()) != 0
+            lib.gcc_jit_target_info_cpu_supports(get_ptr(self), feature.as_ptr()) != 0
         })
     }
 
     pub fn arch(&self) -> Option<&'static CStr> {
         with_lib_without_error_check(|lib| unsafe {
-            let arch = lib.gcc_jit_target_info_arch(self.ptr);
+            let arch = lib.gcc_jit_target_info_arch(get_ptr(self));
             if arch.is_null() {
                 return None;
             }
@@ -42,7 +42,8 @@ impl TargetInfo {
 
     pub fn supports_target_dependent_type(&self, c_type: CType) -> bool {
         with_lib_without_error_check(|lib| unsafe {
-            lib.gcc_jit_target_info_supports_target_dependent_type(self.ptr, c_type.to_sys()) != 0
+            lib.gcc_jit_target_info_supports_target_dependent_type(get_ptr(self), c_type.to_sys())
+                != 0
         })
     }
 }
@@ -50,11 +51,15 @@ impl TargetInfo {
 impl Drop for TargetInfo {
     fn drop(&mut self) {
         with_lib_without_error_check(|lib| unsafe {
-            lib.gcc_jit_target_info_release(self.ptr);
+            lib.gcc_jit_target_info_release(get_ptr(self));
         })
     }
 }
 
 pub unsafe fn from_ptr(ptr: *mut gccjit_sys::gcc_jit_target_info) -> TargetInfo {
     TargetInfo { ptr }
+}
+
+pub unsafe fn get_ptr<'ctx>(target: &TargetInfo) -> *mut gccjit_sys::gcc_jit_target_info {
+    target.ptr
 }
