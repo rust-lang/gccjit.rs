@@ -15,6 +15,8 @@ use object;
 use object::{Object, ToObject};
 use parameter;
 use parameter::Parameter;
+#[cfg(feature = "master")]
+use region::{self, Region};
 use rvalue::{self, RValue};
 use std::ffi::CString;
 use types;
@@ -279,6 +281,22 @@ impl<'ctx> Function<'ctx> {
                 panic!("{} ({:?})", error, self);
             }
             block::from_ptr(ptr)
+        })
+    }
+
+    #[cfg(feature = "master")]
+    pub fn new_region(&self, loc: Option<Location<'ctx>>) -> Region<'ctx> {
+        with_lib(|lib| unsafe {
+            let loc_ptr = match loc {
+                Some(loc) => location::get_ptr(&loc),
+                None => ptr::null_mut(),
+            };
+            let ptr = lib.gcc_jit_function_new_region(self.ptr, loc_ptr);
+            #[cfg(debug_assertions)]
+            if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
+                panic!("{} ({:?})", error, self);
+            }
+            region::from_ptr(ptr)
         })
     }
 

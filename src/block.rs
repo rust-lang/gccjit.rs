@@ -12,6 +12,8 @@ use function::{self, Function};
 use location::{self, Location};
 use lvalue::{self, ToLValue};
 use object::{self, Object, ToObject};
+#[cfg(feature = "master")]
+use region::{self, Region};
 use rvalue::{self, ToRValue};
 
 use crate::with_lib;
@@ -93,6 +95,16 @@ impl<'ctx> Block<'ctx> {
         })
     }
 
+    #[cfg(feature = "master")]
+    pub fn get_successors(&self) -> Vec<Block<'ctx>> {
+        with_lib(|lib| unsafe {
+            let count = lib.gcc_jit_block_get_successor_count(self.ptr);
+            (0..count)
+                .map(|index| from_ptr(lib.gcc_jit_block_get_successor(self.ptr, index)))
+                .collect()
+        })
+    }
+
     /// Evaluates the rvalue parameter and discards its result. Equivalent
     /// to (void)<expr> in C.
     pub fn add_eval<T: ToRValue<'ctx>>(&self, loc: Option<Location<'ctx>>, value: T) {
@@ -114,15 +126,20 @@ impl<'ctx> Block<'ctx> {
     pub fn add_try_catch(
         &self,
         loc: Option<Location<'ctx>>,
-        try_block: Block<'ctx>,
-        catch_block: Block<'ctx>,
+        try_region: Region<'ctx>,
+        catch_region: Region<'ctx>,
     ) {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
         with_lib(|lib| unsafe {
-            lib.gcc_jit_block_add_try_catch(self.ptr, loc_ptr, try_block.ptr, catch_block.ptr);
+            lib.gcc_jit_block_add_try_catch(
+                self.ptr,
+                loc_ptr,
+                region::get_ptr(&try_region),
+                region::get_ptr(&catch_region),
+            );
         });
     }
 
@@ -130,16 +147,46 @@ impl<'ctx> Block<'ctx> {
     pub fn add_try_finally(
         &self,
         loc: Option<Location<'ctx>>,
-        try_block: Block<'ctx>,
-        finally_block: Block<'ctx>,
+        try_region: Region<'ctx>,
+        finally_region: Region<'ctx>,
     ) {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
         with_lib(|lib| unsafe {
-            lib.gcc_jit_block_add_try_finally(self.ptr, loc_ptr, try_block.ptr, finally_block.ptr);
+            lib.gcc_jit_block_add_try_finally(
+                self.ptr,
+                loc_ptr,
+                region::get_ptr(&try_region),
+                region::get_ptr(&finally_region),
+            );
         });
+    }
+
+    #[cfg(feature = "master")]
+    pub fn add_cleanup(
+        &self,
+        loc: Option<Location<'ctx>>,
+        try_region: Region<'ctx>,
+        cleanup_region: Region<'ctx>,
+    ) {
+        let loc_ptr = match loc {
+            Some(loc) => unsafe { location::get_ptr(&loc) },
+            None => ptr::null_mut(),
+        };
+        with_lib(|lib| unsafe {
+            lib.gcc_jit_block_add_cleanup(
+                self.ptr,
+                loc_ptr,
+                region::get_ptr(&try_region),
+                region::get_ptr(&cleanup_region),
+            );
+        });
+        #[cfg(debug_assertions)]
+        if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
+            panic!("{}", error);
+        }
     }
 
     /// Assigns the value of an rvalue to an lvalue directly. Equivalent
@@ -322,6 +369,21 @@ impl<'ctx> Block<'ctx> {
         }
     }
 
+    #[cfg(feature = "master")]
+    pub fn end_with_fallthrough(&self, loc: Option<Location<'ctx>>) {
+        let loc_ptr = match loc {
+            Some(loc) => unsafe { location::get_ptr(&loc) },
+            None => ptr::null_mut(),
+        };
+        with_lib(|lib| unsafe {
+            lib.gcc_jit_block_end_with_fallthrough(self.ptr, loc_ptr);
+        });
+        #[cfg(debug_assertions)]
+        if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
+            panic!("{}", error);
+        }
+    }
+
     pub fn add_extended_asm(
         &self,
         loc: Option<Location<'ctx>>,
@@ -368,6 +430,24 @@ impl<'ctx> Block<'ctx> {
             ))
         })
     }
+}
+
+#[cfg(feature = "master")]
+pub fn clone_blocks<'ctx>(blocks: &[Block<'ctx>]) -> Vec<Block<'ctx>> {
+    if blocks.is_empty() {
+        return Vec::new();
+    }
+    with_lib(|lib| {
+        let mut src: Vec<_> = blocks
+            .iter()
+            .map(|block| unsafe { get_ptr(block) })
+            .collect();
+        let mut dst: Vec<*mut gccjit_sys::gcc_jit_block> = vec![ptr::null_mut(); blocks.len()];
+        unsafe {
+            lib.gcc_jit_blocks_clone(src.len() as c_int, src.as_mut_ptr(), dst.as_mut_ptr());
+            dst.into_iter().map(|ptr| from_ptr(ptr)).collect()
+        }
+    })
 }
 
 pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_block) -> Block<'ctx> {

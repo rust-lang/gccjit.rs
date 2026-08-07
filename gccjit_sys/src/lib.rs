@@ -20,6 +20,7 @@ pub enum gcc_jit_field {}
 pub enum gcc_jit_struct {}
 pub enum gcc_jit_function {}
 pub enum gcc_jit_block {}
+pub enum gcc_jit_region {}
 pub enum gcc_jit_rvalue {}
 pub enum gcc_jit_lvalue {}
 pub enum gcc_jit_param {}
@@ -720,10 +721,10 @@ extern_maybe_dlopen! {
     fn gcc_jit_lvalue_add_string_attribute(variable: *mut gcc_jit_lvalue, attribute: gcc_jit_variable_attribute, value: *const c_char);
 
     #[cfg(feature="master")]
-    fn gcc_jit_block_add_try_catch(block: *mut gcc_jit_block, loc: *mut gcc_jit_location, try_block: *mut gcc_jit_block, catch_block: *mut gcc_jit_block);
+    fn gcc_jit_block_add_try_catch(block: *mut gcc_jit_block, loc: *mut gcc_jit_location, try_block: *mut gcc_jit_region, catch_block: *mut gcc_jit_region);
 
     #[cfg(feature="master")]
-    fn gcc_jit_block_add_try_finally(block: *mut gcc_jit_block, loc: *mut gcc_jit_location, try_block: *mut gcc_jit_block, finally_block: *mut gcc_jit_block);
+    fn gcc_jit_block_add_try_finally(block: *mut gcc_jit_block, loc: *mut gcc_jit_location, try_block: *mut gcc_jit_region, finally_block: *mut gcc_jit_region);
 
     #[cfg(feature="master")]
     fn gcc_jit_function_set_personality_function(func: *mut gcc_jit_function, personality_func: *mut gcc_jit_function);
@@ -803,4 +804,31 @@ extern_maybe_dlopen! {
     fn gcc_jit_type_add_integer_attribute(ty: *mut gcc_jit_type,
                                           attribute: gcc_jit_type_attribute,
                                           value: c_int);
+
+    #[cfg(feature="master")]
+    fn gcc_jit_block_end_with_fallthrough(block: *mut gcc_jit_block,
+                                          loc: *mut gcc_jit_location);
+    #[cfg(feature="master")]
+    fn gcc_jit_block_add_cleanup(block: *mut gcc_jit_block,
+                                 loc: *mut gcc_jit_location,
+                                 try_region: *mut gcc_jit_region,
+                                 cleanup_region: *mut gcc_jit_region);
+    #[cfg(feature="master")]
+    fn gcc_jit_function_new_region(func: *mut gcc_jit_function,
+                                   loc: *mut gcc_jit_location) -> *mut gcc_jit_region;
+    #[cfg(feature="master")]
+    fn gcc_jit_region_new_block(region: *mut gcc_jit_region,
+                                name: *const c_char) -> *mut gcc_jit_block;
+    #[cfg(feature="master")]
+    fn gcc_jit_region_add_block(region: *mut gcc_jit_region,
+                                block: *mut gcc_jit_block);
+    #[cfg(feature="master")]
+    fn gcc_jit_blocks_clone(num_blocks: c_int,
+                            blocks: *mut *mut gcc_jit_block,
+                            out_clones: *mut *mut gcc_jit_block);
+    #[cfg(feature="master")]
+    fn gcc_jit_block_get_successor_count(block: *mut gcc_jit_block) -> c_int;
+    #[cfg(feature="master")]
+    fn gcc_jit_block_get_successor(block: *mut gcc_jit_block,
+                                   index: c_int) -> *mut gcc_jit_block;
 }

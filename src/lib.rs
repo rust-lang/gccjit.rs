@@ -27,6 +27,8 @@ mod location;
 mod lvalue;
 mod object;
 mod parameter;
+#[cfg(feature = "master")]
+mod region;
 mod rvalue;
 mod structs;
 #[cfg(feature = "master")]
@@ -38,6 +40,8 @@ use std::ffi::CStr;
 #[cfg(feature = "dlopen")]
 use std::sync::OnceLock;
 
+#[cfg(feature = "master")]
+pub use block::clone_blocks;
 pub use block::{BinaryOp, Block, ComparisonOp, UnaryOp};
 pub use context::CType;
 pub use context::CompileResult;
@@ -56,6 +60,8 @@ pub use lvalue::{VarAttribute, Visibility};
 pub use object::Object;
 pub use object::ToObject;
 pub use parameter::Parameter;
+#[cfg(feature = "master")]
+pub use region::Region;
 pub use rvalue::{RValue, ToRValue};
 pub use structs::Struct;
 #[cfg(feature = "master")]
