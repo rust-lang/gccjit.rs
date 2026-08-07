@@ -109,7 +109,7 @@ pub fn is_lto_supported() -> bool {
 }
 
 #[cfg(not(feature = "dlopen"))]
-fn with_lib<'ctx, C: context::ContextGetter<'ctx>, T, F: Fn(&Libgccjit) -> T>(
+fn with_lib<'ctx, C: context::ContextGetter<'ctx>, T, F: FnOnce(&Libgccjit) -> T>(
     ctx: &C,
     callback: F,
 ) -> T {
@@ -122,12 +122,12 @@ fn with_lib<'ctx, C: context::ContextGetter<'ctx>, T, F: Fn(&Libgccjit) -> T>(
 }
 
 #[cfg(not(feature = "dlopen"))]
-fn with_lib_without_error_check<T, F: Fn(&Libgccjit) -> T>(callback: F) -> T {
+fn with_lib_without_error_check<T, F: FnOnce(&Libgccjit) -> T>(callback: F) -> T {
     callback(&LIB)
 }
 
 #[cfg(feature = "dlopen")]
-fn with_lib<'ctx, C: context::ContextGetter<'ctx>, T, F: Fn(&Libgccjit) -> T>(
+fn with_lib<'ctx, C: context::ContextGetter<'ctx>, T, F: FnOnce(&Libgccjit) -> T>(
     ctx: &C,
     callback: F,
 ) -> T {
@@ -140,7 +140,7 @@ fn with_lib<'ctx, C: context::ContextGetter<'ctx>, T, F: Fn(&Libgccjit) -> T>(
 }
 
 #[cfg(feature = "dlopen")]
-fn with_lib_without_error_check<T, F: Fn(&Libgccjit) -> T>(callback: F) -> T {
+fn with_lib_without_error_check<T, F: FnOnce(&Libgccjit) -> T>(callback: F) -> T {
     let lib = LIB.get().and_then(|lib| lib.as_ref());
     match lib {
         Some(lib) => callback(lib),
