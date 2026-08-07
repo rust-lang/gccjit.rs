@@ -1365,25 +1365,27 @@ mod tests {
     #[test]
     fn create_field() {
         let ctx = Context::default();
-        let int_type = ctx.new_type::<i32>();
+        let int_type = ctx.new_type::<i32>().unwrap();
         let _int_field = ctx.new_field(None, int_type, "x");
     }
 
     #[test]
     fn basic_function() {
         let context = Context::default();
-        let int_ty = context.new_type::<i32>();
-        let parameter = context.new_parameter(None, int_ty, "x");
-        let fun = context.new_function(
-            None,
-            FunctionType::Exported,
-            int_ty,
-            &[parameter],
-            "square",
-            false,
-        );
-        let block = fun.new_block("main_block");
-        let parm = fun.get_param(0).to_rvalue();
+        let int_ty = context.new_type::<i32>().unwrap();
+        let parameter = context.new_parameter(None, int_ty, "x").unwrap();
+        let fun = context
+            .new_function(
+                None,
+                FunctionType::Exported,
+                int_ty,
+                &[parameter],
+                "square",
+                false,
+            )
+            .unwrap();
+        let block = fun.new_block("main_block").unwrap();
+        let parm = fun.get_param(0).unwrap().to_rvalue();
         let square = parm * parm;
         block.end_with_return(None, square);
 
