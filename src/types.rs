@@ -143,7 +143,7 @@ impl<'ctx> Type<'ctx> {
 
     #[cfg(feature = "master")]
     pub fn set_addressable(&self) {
-        with_lib(&self, |lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_type_set_addressable(self.ptr);
         })
     }

@@ -182,7 +182,7 @@ static LIB: Libgccjit = Libgccjit::new();
 #[cfg(feature = "master")]
 pub fn set_lang_name(lang_name: &'static CStr) {
     unsafe {
-        with_lib(self, |lib| {
+        with_lib_without_error_check(|lib| {
             lib.gcc_jit_set_lang_name(lang_name.as_ptr());
         });
     }

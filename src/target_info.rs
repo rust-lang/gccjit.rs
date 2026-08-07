@@ -4,7 +4,7 @@ use std::{
     fmt,
 };
 
-use crate::with_lib;
+use crate::with_lib_without_error_check;
 
 pub struct TargetInfo {
     ptr: *mut gccjit_sys::gcc_jit_target_info,
@@ -25,13 +25,13 @@ impl TargetInfo {
             Ok(feature) => feature,
             Err(_) => return false,
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_without_error_check(|lib| unsafe {
             lib.gcc_jit_target_info_cpu_supports(self.ptr, feature.as_ptr()) != 0
         })
     }
 
     pub fn arch(&self) -> Option<&'static CStr> {
-        with_lib(self, |lib| unsafe {
+        with_lib_without_error_check(|lib| unsafe {
             let arch = lib.gcc_jit_target_info_arch(self.ptr);
             if arch.is_null() {
                 return None;
@@ -41,7 +41,7 @@ impl TargetInfo {
     }
 
     pub fn supports_target_dependent_type(&self, c_type: CType) -> bool {
-        with_lib(self, |lib| unsafe {
+        with_lib_without_error_check(|lib| unsafe {
             lib.gcc_jit_target_info_supports_target_dependent_type(self.ptr, c_type.to_sys()) != 0
         })
     }
@@ -49,7 +49,7 @@ impl TargetInfo {
 
 impl Drop for TargetInfo {
     fn drop(&mut self) {
-        with_lib(self, |lib| unsafe {
+        with_lib_without_error_check(|lib| unsafe {
             lib.gcc_jit_target_info_release(self.ptr);
         })
     }
