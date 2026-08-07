@@ -4,7 +4,7 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::str;
 
-use crate::{context, with_lib};
+use crate::{context, with_lib, with_lib_without_error_check};
 
 /// Object represents the root of all objects in gccjit. It is not useful
 /// in and of itself, but it provides the implementation for Debug
@@ -50,7 +50,7 @@ impl<'ctx> Deref for ContextRef<'ctx> {
 
 impl<'ctx> Object<'ctx> {
     pub fn get_context(&self) -> ContextRef<'ctx> {
-        with_lib(self, |lib| unsafe {
+        with_lib_without_error_check(|lib| unsafe {
             ContextRef {
                 context: ManuallyDrop::new(context::from_ptr(
                     lib.gcc_jit_object_get_context(self.ptr),

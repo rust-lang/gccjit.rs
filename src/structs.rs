@@ -11,7 +11,7 @@ use object::{Object, ToObject};
 use types;
 use types::Type;
 
-use crate::with_lib;
+use crate::{with_lib, with_lib_without_error_check};
 
 /// A Struct is gccjit's representation of a composite type. Despite the name,
 /// Struct can represent either a struct, an union, or an opaque named type.
@@ -23,7 +23,7 @@ pub struct Struct<'ctx> {
 
 impl<'ctx> Struct<'ctx> {
     pub fn as_type(&self) -> Type<'ctx> {
-        with_lib(self, |lib| unsafe {
+        with_lib_without_error_check(|lib| unsafe {
             let ptr = lib.gcc_jit_struct_as_type(self.ptr);
             types::from_ptr(ptr)
         })

@@ -29,6 +29,7 @@ pub struct VectorType<'ctx> {
 }
 
 impl<'ctx> VectorType<'ctx> {
+    // FIXME: Return `Option` and check if ptr is NULL.
     unsafe fn from_ptr(ptr: *mut gccjit_sys::gcc_jit_vector_type) -> VectorType<'ctx> {
         VectorType {
             marker: PhantomData,
@@ -72,6 +73,7 @@ impl<'ctx> fmt::Debug for FunctionPtrType<'ctx> {
 }
 
 impl<'ctx> FunctionPtrType<'ctx> {
+    // FIXME: Return `Option` and check if ptr is NULL.
     unsafe fn from_ptr(ptr: *mut gccjit_sys::gcc_jit_function_type) -> FunctionPtrType<'ctx> {
         FunctionPtrType {
             marker: PhantomData,
