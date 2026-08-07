@@ -77,13 +77,6 @@ jobs:
         if: ${{ matrix.os == 'windows-2025' }}
         run: cargo build --features master,dlopen
 
-      - name: Test
-        if: ${{ matrix.os == 'ubuntu-24.04' }}
-        run: |
-          cargo test
-          cd examples/factorial
-          cargo build
-
       - name: clippy
         run: |
           cargo clippy --all-targets -- -D warnings
@@ -92,3 +85,16 @@ jobs:
           cd gccjit_sys
           cargo clippy --all-targets -- -D warnings
           cargo clippy --all-targets --features master,dlopen -- -D warnings
+
+      - name: Test
+        if: ${{ matrix.os == 'ubuntu-24.04' }}
+        run: |
+          cargo test
+          cd examples/factorial
+          cargo build
+          cd ../brainfuck
+          cargo build
+          cd ../hello_world
+          cargo build
+          cd ../square_function
+          cargo build

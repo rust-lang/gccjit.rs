@@ -9,22 +9,20 @@ use std::mem;
 
 fn main() {
     let context = Context::default();
-    let void_ty = context.new_type::<()>();
+    let void_ty = context.new_type::<()>().unwrap();
     let fun = context.new_function(None,
                                    FunctionType::Exported,
                                    void_ty,
                                    &[],
                                    "hello",
-                                   false);
-    let block = fun.new_block("main_block");
+                                   false).unwrap();
+    let block = fun.new_block("main_block").unwrap();
     let function_ptr = context.new_function_pointer_type(None,
                                                          void_ty,
                                                          &[],
-                                                         false);
-    let ptr = unsafe {
-        context.new_rvalue_from_ptr(function_ptr, say_hello as *mut ())
-    };
-    let call = context.new_call_through_ptr(None, ptr, &[]);
+                                                         false).unwrap();
+    let ptr = context.new_rvalue_from_ptr(function_ptr, say_hello as *mut ()).unwrap();
+    let call = context.new_call_through_ptr(None, ptr, &[]).unwrap();
     block.add_eval(None, call);
     block.end_with_void_return(None);
     let result = context.compile();

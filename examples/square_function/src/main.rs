@@ -13,16 +13,16 @@ fn main() {
     let context = Context::default();
     context.set_dump_code_on_compile(true);
     context.set_optimization_level(OptimizationLevel::Standard);
-    let int_ty = context.new_type::<i32>();
-    let parameter = context.new_parameter(None, int_ty, "x");
+    let int_ty = context.new_type::<i32>().unwrap();
+    let parameter = context.new_parameter(None, int_ty, "x").unwrap();
     let fun = context.new_function(None,
                                    FunctionType::Exported,
                                    int_ty,
                                    &[parameter],
                                    "square",
-                                   false);
-    let block = fun.new_block("main_block");
-    let parm = fun.get_param(0).to_rvalue();
+                                   false).unwrap();
+    let block = fun.new_block("main_block").unwrap();
+    let parm = fun.get_param(0).unwrap().to_rvalue();
     let square = parm * parm;
     block.end_with_return(None, square);
     let result = context.compile();
