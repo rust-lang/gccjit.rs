@@ -71,9 +71,7 @@ macro_rules! binary_operator_for {
                     let rhs_rvalue = rhs.to_rvalue();
                     let obj_ptr = object::get_ptr(&self.to_object());
                     let ctx_ptr = lib.gcc_jit_object_get_context(obj_ptr);
-                    let ty = rhs
-                        .get_type()
-                        .expect("Failed to get Type to compute RValue");
+                    let ty = rhs.get_type()?;
                     let ptr = lib.gcc_jit_context_new_binary_op(
                         ctx_ptr,
                         ptr::null_mut(),
@@ -82,8 +80,9 @@ macro_rules! binary_operator_for {
                         get_ptr(&self),
                         rhs_rvalue.ptr.as_ptr(),
                     );
-                    from_ptr(ptr).expect("Failed to compute RValue")
+                    from_ptr(ptr)
                 })
+                .expect("RValue operation failed")
             }
         }
     };

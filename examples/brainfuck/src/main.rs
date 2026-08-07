@@ -31,15 +31,9 @@ fn main() {
         panic!("unbalanced brackets");
     }
 
-    let result = context.compile();
-    let main_result = result.get_function("bf_main");
-    let main : extern "C" fn() =
-        if !main_result.is_null() {
-            unsafe { mem::transmute(main_result) }
-        }
-        else {
-           panic!("failed to codegen")
-        };
+    let result = context.compile().unwrap();
+    let main_result = result.get_function("bf_main").unwrap();
+    let main: extern "C" fn() = unsafe { mem::transmute(main_result) };
     main();
 }
 

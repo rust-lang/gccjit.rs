@@ -88,7 +88,7 @@ pub enum OutputKind {
 /// JIT compiled functions are exposted to Rust as an extern "C" function
 /// pointer.
 pub struct CompileResult {
-    ptr: *mut gccjit_sys::gcc_jit_result,
+    ptr: NonNull<gccjit_sys::gcc_jit_result>,
 }
 
 impl CompileResult {
@@ -101,12 +101,12 @@ impl CompileResult {
     /// the caller's responsibility to check whether or not the pointer
     /// is null. It is also expected that the caller of this function
     /// will transmute this pointer to a function pointer type.
-    pub fn get_function<S: AsRef<str>>(&self, name: S) -> *mut () {
+    pub fn get_function<S: AsRef<str>>(&self, name: S) -> Option<NonNull<()>> {
         let c_str = CString::new(name.as_ref()).unwrap();
-        with_lib_without_error_check(|lib| unsafe {
-            let func = lib.gcc_jit_result_get_code(self.ptr, c_str.as_ptr());
+        NonNull::new(with_lib_without_error_check(|lib| unsafe {
+            let func = lib.gcc_jit_result_get_code(self.get_ptr(), c_str.as_ptr());
             mem::transmute(func)
-        })
+        }))
     }
 
     /// Gets a pointer to a global variable that lives on the JIT heap.
@@ -115,19 +115,23 @@ impl CompileResult {
     /// to ensure that the pointer is not used past the lifetime of the
     /// CompileResult object. It is also the caller's responsibility to
     /// check whether or not the returned pointer is null.
-    pub fn get_global<S: AsRef<str>>(&self, name: S) -> *mut () {
+    pub fn get_global<S: AsRef<str>>(&self, name: S) -> Option<NonNull<()>> {
         let c_str = CString::new(name.as_ref()).unwrap();
-        with_lib_without_error_check(|lib| unsafe {
-            let ptr = lib.gcc_jit_result_get_global(self.ptr, c_str.as_ptr());
+        NonNull::new(with_lib_without_error_check(|lib| unsafe {
+            let ptr = lib.gcc_jit_result_get_global(self.get_ptr(), c_str.as_ptr());
             mem::transmute(ptr)
-        })
+        }))
+    }
+
+    pub(crate) fn get_ptr(&self) -> *mut gccjit_sys::gcc_jit_result {
+        self.ptr.as_ptr()
     }
 }
 
 impl Drop for CompileResult {
     fn drop(&mut self) {
         with_lib_without_error_check(|lib| unsafe {
-            lib.gcc_jit_result_release(self.ptr);
+            lib.gcc_jit_result_release(self.get_ptr());
         })
     }
 }
@@ -313,11 +317,11 @@ impl<'ctx> Context<'ctx> {
     /// Compiles the context and returns a CompileResult that contains
     /// the means to access functions and globals that have currently
     /// been JIT compiled.
-    pub fn compile(&self) -> CompileResult {
+    pub fn compile(&self) -> Option<CompileResult> {
         with_lib(self, |lib| unsafe {
-            CompileResult {
-                ptr: lib.gcc_jit_context_compile(get_ptr(self)),
-            }
+            Some(CompileResult {
+                ptr: NonNull::new(lib.gcc_jit_context_compile(get_ptr(self)))?,
+            })
         })
     }
 
@@ -1389,10 +1393,11 @@ mod tests {
         let square = parm * parm;
         block.end_with_return(None, square);
 
-        let result = context.compile();
+        let result = context.compile().expect("failed to get compile code");
         unsafe {
-            let func_ptr = result.get_function("square");
-            assert!(!func_ptr.is_null());
+            let func_ptr = result
+                .get_function("square")
+                .expect("failed to get `square` function");
             let func: extern "C" fn(i32) -> i32 = mem::transmute(func_ptr);
             assert_eq!(func(4), 16);
             assert_eq!(func(9), 81);

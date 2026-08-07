@@ -25,14 +25,9 @@ fn main() {
     let call = context.new_call_through_ptr(None, ptr, &[]).unwrap();
     block.add_eval(None, call);
     block.end_with_void_return(None);
-    let result = context.compile();
-    let hello = result.get_function("hello");
-    let hello_fn : extern "C" fn() =
-        if !hello.is_null() {
-            unsafe { mem::transmute(hello) }
-        } else {
-            panic!("failed to retrieve function");
-        };
+    let result = context.compile().unwrap();
+    let hello = result.get_function("hello").unwrap();
+    let hello_fn : extern "C" fn() = unsafe { mem::transmute(hello) };
     hello_fn();
 }
 
