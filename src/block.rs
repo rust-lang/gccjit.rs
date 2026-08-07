@@ -102,11 +102,11 @@ impl<'ctx> Block<'ctx> {
     }
 
     #[cfg(feature = "master")]
-    pub fn get_successors(&self) -> Vec<Block<'ctx>> {
+    pub fn get_successors(&self) -> Option<Vec<Block<'ctx>>> {
         with_lib(self, |lib| unsafe {
             let count = lib.gcc_jit_block_get_successor_count(get_ptr(self));
             (0..count)
-                .filter_map(|index| from_ptr(lib.gcc_jit_block_get_successor(get_ptr(self), index)))
+                .map(|index| from_ptr(lib.gcc_jit_block_get_successor(get_ptr(self), index)))
                 .collect()
         })
     }
@@ -409,9 +409,9 @@ impl<'ctx> Block<'ctx> {
 }
 
 #[cfg(feature = "master")]
-pub fn clone_blocks<'ctx>(blocks: &[Block<'ctx>]) -> Vec<Block<'ctx>> {
+pub fn clone_blocks<'ctx>(blocks: &[Block<'ctx>]) -> Option<Vec<Block<'ctx>>> {
     if blocks.is_empty() {
-        return Vec::new();
+        return Some(Vec::new());
     }
     with_lib(&blocks[0], |lib| {
         let mut src: Vec<_> = blocks
@@ -421,7 +421,7 @@ pub fn clone_blocks<'ctx>(blocks: &[Block<'ctx>]) -> Vec<Block<'ctx>> {
         let mut dst: Vec<*mut gccjit_sys::gcc_jit_block> = vec![ptr::null_mut(); blocks.len()];
         unsafe {
             lib.gcc_jit_blocks_clone(src.len() as c_int, src.as_mut_ptr(), dst.as_mut_ptr());
-            dst.into_iter().filter_map(|ptr| from_ptr(ptr)).collect()
+            dst.into_iter().map(|ptr| from_ptr(ptr)).collect()
         }
     })
 }

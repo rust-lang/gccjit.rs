@@ -287,17 +287,13 @@ impl<'ctx> Function<'ctx> {
     }
 
     #[cfg(feature = "master")]
-    pub fn new_region(&self, loc: Option<Location<'ctx>>) -> Region<'ctx> {
+    pub fn new_region(&self, loc: Option<Location<'ctx>>) -> Option<Region<'ctx>> {
         with_lib(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
             };
             let ptr = lib.gcc_jit_function_new_region(get_ptr(self), loc_ptr);
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-                panic!("{} ({:?})", error, self);
-            }
             region::from_ptr(ptr)
         })
     }

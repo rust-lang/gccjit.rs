@@ -26,6 +26,7 @@ use Type;
 use crate::{with_lib, with_lib_without_error_check};
 
 pub(crate) trait ContextGetter<'ctx> {
+    #[allow(dead_code)] // Only used with `#[cfg(debug_assertions)]`.
     fn context(&self) -> crate::ContextRef<'ctx>;
 }
 

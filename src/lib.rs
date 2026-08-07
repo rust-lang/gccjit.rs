@@ -110,12 +110,12 @@ pub fn is_lto_supported() -> bool {
 
 #[cfg(not(feature = "dlopen"))]
 fn with_lib<'ctx, C: context::ContextGetter<'ctx>, T, F: FnOnce(&Libgccjit) -> T>(
-    ctx: &C,
+    _ctx: &C,
     callback: F,
 ) -> T {
     let ret = with_lib_without_error_check(callback);
     #[cfg(debug_assertions)]
-    if let Ok(Some(error)) = ctx.context().get_last_error() {
+    if let Ok(Some(error)) = _ctx.context().get_last_error() {
         panic!("{}", error);
     }
     ret
@@ -128,12 +128,12 @@ fn with_lib_without_error_check<T, F: FnOnce(&Libgccjit) -> T>(callback: F) -> T
 
 #[cfg(feature = "dlopen")]
 fn with_lib<'ctx, C: context::ContextGetter<'ctx>, T, F: FnOnce(&Libgccjit) -> T>(
-    ctx: &C,
+    _ctx: &C,
     callback: F,
 ) -> T {
     let ret = with_lib_without_error_check(callback);
     #[cfg(debug_assertions)]
-    if let Ok(Some(error)) = ctx.context().get_last_error() {
+    if let Ok(Some(error)) = _ctx.context().get_last_error() {
         panic!("{}", error);
     }
     ret
