@@ -31,7 +31,7 @@ mod parameter;
 mod region;
 mod rvalue;
 mod structs;
-#[cfg(feature="master")]
+#[cfg(feature = "master")]
 mod target_info;
 mod types;
 
@@ -64,7 +64,7 @@ pub use parameter::Parameter;
 pub use region::Region;
 pub use rvalue::{RValue, ToRValue};
 pub use structs::Struct;
-#[cfg(feature="master")]
+#[cfg(feature = "master")]
 pub use target_info::TargetInfo;
 pub use types::FunctionPtrType;
 pub use types::Type;

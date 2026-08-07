@@ -284,25 +284,23 @@ impl<'ctx> Function<'ctx> {
         })
     }
 
-    #[cfg(feature="master")]
+    #[cfg(feature = "master")]
     pub fn new_region(&self, loc: Option<Location<'ctx>>) -> Region<'ctx> {
-        with_lib(|lib| {
-            unsafe {
-                let loc_ptr = match loc {
-                    Some(loc) => location::get_ptr(&loc),
-                    None => ptr::null_mut()
-                };
-                let ptr = lib.gcc_jit_function_new_region(self.ptr, loc_ptr);
-                #[cfg(debug_assertions)]
-                if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-                    panic!("{} ({:?})", error, self);
-                }
-                region::from_ptr(ptr)
+        with_lib(|lib| unsafe {
+            let loc_ptr = match loc {
+                Some(loc) => location::get_ptr(&loc),
+                None => ptr::null_mut(),
+            };
+            let ptr = lib.gcc_jit_function_new_region(self.ptr, loc_ptr);
+            #[cfg(debug_assertions)]
+            if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
+                panic!("{} ({:?})", error, self);
             }
+            region::from_ptr(ptr)
         })
     }
 
-    #[cfg(feature="master")]
+    #[cfg(feature = "master")]
     pub fn set_personality_function(&self, personality_func: Function<'ctx>) {
         with_lib(|lib| unsafe {
             lib.gcc_jit_function_set_personality_function(self.ptr, personality_func.ptr);
