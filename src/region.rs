@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use block::{self, Block};
 use context::Context;
 
-use crate::with_lib;
+use crate::with_lib_without_error_check;
 
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct Region<'ctx> {
@@ -20,8 +20,8 @@ impl<'ctx> fmt::Debug for Region<'ctx> {
 }
 
 impl<'ctx> Region<'ctx> {
-    pub fn new_block<S: AsRef<str>>(&self, name: S) -> Block<'ctx> {
-        with_lib(|lib| unsafe {
+    pub fn new_block<S: AsRef<str>>(&self, name: S) -> Option<Block<'ctx>> {
+        with_lib_without_error_check(|lib| unsafe {
             let cstr = CString::new(name.as_ref()).unwrap();
             let ptr = lib.gcc_jit_region_new_block(self.ptr, cstr.as_ptr());
             block::from_ptr(ptr)
@@ -29,7 +29,7 @@ impl<'ctx> Region<'ctx> {
     }
 
     pub fn add_block(&self, blk: Block<'ctx>) {
-        with_lib(|lib| unsafe {
+        with_lib_without_error_check(|lib| unsafe {
             lib.gcc_jit_region_add_block(self.ptr, block::get_ptr(&blk));
         })
     }

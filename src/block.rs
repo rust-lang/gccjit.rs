@@ -103,10 +103,10 @@ impl<'ctx> Block<'ctx> {
 
     #[cfg(feature = "master")]
     pub fn get_successors(&self) -> Vec<Block<'ctx>> {
-        with_lib(|lib| unsafe {
-            let count = lib.gcc_jit_block_get_successor_count(self.ptr);
+        with_lib(self, |lib| unsafe {
+            let count = lib.gcc_jit_block_get_successor_count(get_ptr(self));
             (0..count)
-                .map(|index| from_ptr(lib.gcc_jit_block_get_successor(self.ptr, index)))
+                .filter_map(|index| from_ptr(lib.gcc_jit_block_get_successor(get_ptr(self), index)))
                 .collect()
         })
     }
@@ -135,9 +135,9 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_block_add_try_catch(
-                get_ptr(self.ptr),
+                get_ptr(self),
                 loc_ptr,
                 region::get_ptr(&try_region),
                 region::get_ptr(&catch_region),
@@ -156,9 +156,9 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_block_add_try_finally(
-                get_ptr(self.ptr),
+                get_ptr(self),
                 loc_ptr,
                 region::get_ptr(&try_region),
                 region::get_ptr(&finally_region),
@@ -177,9 +177,9 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
+        with_lib(self, |lib| unsafe {
             lib.gcc_jit_block_add_cleanup(
-                self.ptr,
+                get_ptr(self),
                 loc_ptr,
                 region::get_ptr(&try_region),
                 region::get_ptr(&cleanup_region),
@@ -351,8 +351,8 @@ impl<'ctx> Block<'ctx> {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(|lib| unsafe {
-            lib.gcc_jit_block_end_with_fallthrough(self.ptr, loc_ptr);
+        with_lib(self, |lib| unsafe {
+            lib.gcc_jit_block_end_with_fallthrough(get_ptr(self), loc_ptr);
         });
         #[cfg(debug_assertions)]
         if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
@@ -413,7 +413,7 @@ pub fn clone_blocks<'ctx>(blocks: &[Block<'ctx>]) -> Vec<Block<'ctx>> {
     if blocks.is_empty() {
         return Vec::new();
     }
-    with_lib(|lib| {
+    with_lib(&blocks[0], |lib| {
         let mut src: Vec<_> = blocks
             .iter()
             .map(|block| unsafe { get_ptr(block) })
@@ -421,7 +421,7 @@ pub fn clone_blocks<'ctx>(blocks: &[Block<'ctx>]) -> Vec<Block<'ctx>> {
         let mut dst: Vec<*mut gccjit_sys::gcc_jit_block> = vec![ptr::null_mut(); blocks.len()];
         unsafe {
             lib.gcc_jit_blocks_clone(src.len() as c_int, src.as_mut_ptr(), dst.as_mut_ptr());
-            dst.into_iter().map(|ptr| from_ptr(ptr)).collect()
+            dst.into_iter().filter_map(|ptr| from_ptr(ptr)).collect()
         }
     })
 }
