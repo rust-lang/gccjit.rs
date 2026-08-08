@@ -108,7 +108,54 @@ pub fn is_lto_supported() -> bool {
     with_lib_without_error_check(|lib| unsafe { lib.gcc_jit_is_lto_supported() })
 }
 
+/// Runs a libgccjit call that returns a handle and is not expected to fail,
+/// panicking with libgccjit's own diagnostic when it does.
+#[track_caller]
+pub(crate) fn with_lib_handle<'ctx, C, T, F>(ctx: &C, callback: F) -> T
+where
+    C: context::ContextGetter<'ctx>,
+    F: FnOnce(&Libgccjit) -> Option<T>,
+{
+    match with_lib_without_error_check(callback) {
+        Some(handle) => {
+            #[cfg(debug_assertions)]
+            if let Ok(Some(error)) = ctx.context().get_last_error() {
+                panic!("{}", error);
+            }
+            handle
+        }
+        None => panic_on_null(ctx),
+    }
+}
+
+#[cold]
+#[track_caller]
+fn panic_on_null<'ctx, C: context::ContextGetter<'ctx>>(ctx: &C) -> ! {
+    match ctx.context().get_last_error() {
+        Ok(Some(error)) => panic!("gccjit: {}", error),
+        _ => panic!("gccjit: call returned NULL (libgccjit recorded no error; see stderr)"),
+    }
+}
+
+#[track_caller]
+pub(crate) fn expect_handle_without_context<T>(handle: Option<T>, operation: &str) -> T {
+    match handle {
+        Some(handle) => handle,
+        None => panic_without_context(operation),
+    }
+}
+
+#[cold]
+#[track_caller]
+fn panic_without_context(operation: &str) -> ! {
+    panic!(
+        "gccjit: {} returned NULL (no context available to query; see stderr)",
+        operation
+    )
+}
+
 #[cfg(not(feature = "dlopen"))]
+#[cfg_attr(debug_assertions, track_caller)]
 fn with_lib<'ctx, C: context::ContextGetter<'ctx>, T, F: FnOnce(&Libgccjit) -> T>(
     _ctx: &C,
     callback: F,
@@ -127,6 +174,7 @@ fn with_lib_without_error_check<T, F: FnOnce(&Libgccjit) -> T>(callback: F) -> T
 }
 
 #[cfg(feature = "dlopen")]
+#[cfg_attr(debug_assertions, track_caller)]
 fn with_lib<'ctx, C: context::ContextGetter<'ctx>, T, F: FnOnce(&Libgccjit) -> T>(
     _ctx: &C,
     callback: F,

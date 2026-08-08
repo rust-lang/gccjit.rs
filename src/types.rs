@@ -12,7 +12,9 @@ use gccjit_sys::gcc_jit_types::*;
 
 #[cfg(feature = "master")]
 use crate::lvalue::AttributeValue;
-use crate::{with_lib, with_lib_without_error_check};
+use crate::{
+    expect_handle_without_context, with_lib, with_lib_handle, with_lib_without_error_check,
+};
 
 /// A representation of a type, as it is known to the JIT compiler.
 /// Types can be created through the Typeable trait or they can
@@ -37,15 +39,17 @@ impl<'ctx> VectorType<'ctx> {
         })
     }
 
-    pub fn get_element_type(&self) -> Option<Type<'ctx>> {
+    #[track_caller]
+    pub fn get_element_type(&self) -> Type<'ctx> {
         let typ = with_lib_without_error_check(|lib| unsafe {
             from_ptr(lib.gcc_jit_vector_type_get_element_type(self.get_ptr()))
-        })?;
+        });
+        let typ = expect_handle_without_context(typ, "gcc_jit_vector_type_get_element_type");
         #[cfg(debug_assertions)]
         if let Ok(Some(error)) = typ.to_object().get_context().get_last_error() {
             panic!("{}", error);
         }
-        Some(typ)
+        typ
     }
 
     pub fn get_num_units(&self) -> usize {
@@ -85,15 +89,17 @@ impl<'ctx> FunctionPtrType<'ctx> {
         })
     }
 
-    pub fn get_return_type(&self) -> Option<Type<'ctx>> {
+    #[track_caller]
+    pub fn get_return_type(&self) -> Type<'ctx> {
         let typ = with_lib_without_error_check(|lib| unsafe {
             from_ptr(lib.gcc_jit_function_type_get_return_type(self.get_ptr()))
-        })?;
+        });
+        let typ = expect_handle_without_context(typ, "gcc_jit_function_type_get_return_type");
         #[cfg(debug_assertions)]
         if let Ok(Some(error)) = typ.to_object().get_context().get_last_error() {
             panic!("{}", error);
         }
-        Some(typ)
+        typ
     }
 
     pub fn get_param_count(&self) -> usize {
@@ -102,15 +108,17 @@ impl<'ctx> FunctionPtrType<'ctx> {
         })
     }
 
-    pub fn get_param_type(&self, index: usize) -> Option<Type<'ctx>> {
+    #[track_caller]
+    pub fn get_param_type(&self, index: usize) -> Type<'ctx> {
         let typ = with_lib_without_error_check(|lib| unsafe {
             from_ptr(lib.gcc_jit_function_type_get_param_type(self.get_ptr(), index as _))
-        })?;
+        });
+        let typ = expect_handle_without_context(typ, "gcc_jit_function_type_get_param_type");
         #[cfg(debug_assertions)]
         if let Ok(Some(error)) = typ.to_object().get_context().get_last_error() {
             panic!("{}", error);
         }
-        Some(typ)
+        typ
     }
 
     fn get_ptr(&self) -> *mut gccjit_sys::gcc_jit_function_type {
@@ -142,8 +150,9 @@ impl<'ctx> fmt::Debug for Type<'ctx> {
 
 impl<'ctx> Type<'ctx> {
     /// Given a type T, creates a type to *T, a pointer to T.
-    pub fn make_pointer(self) -> Option<Type<'ctx>> {
-        with_lib(&self, |lib| unsafe {
+    #[track_caller]
+    pub fn make_pointer(self) -> Type<'ctx> {
+        with_lib_handle(&self, |lib| unsafe {
             from_ptr(lib.gcc_jit_type_get_pointer(get_ptr(&self)))
         })
     }
@@ -156,16 +165,18 @@ impl<'ctx> Type<'ctx> {
     }
 
     /// Given a type T, creates a type of const T.
-    pub fn make_const(self) -> Option<Type<'ctx>> {
-        with_lib(&self, |lib| unsafe {
+    #[track_caller]
+    pub fn make_const(self) -> Type<'ctx> {
+        with_lib_handle(&self, |lib| unsafe {
             from_ptr(lib.gcc_jit_type_get_const(get_ptr(&self)))
         })
     }
 
     /// Given a type T, creates a new type of volatile T, which
     /// has the semantics of C's volatile.
-    pub fn make_volatile(self) -> Option<Type<'ctx>> {
-        with_lib(&self, |lib| unsafe {
+    #[track_caller]
+    pub fn make_volatile(self) -> Type<'ctx> {
+        with_lib_handle(&self, |lib| unsafe {
             from_ptr(lib.gcc_jit_type_get_volatile(get_ptr(&self)))
         })
     }
@@ -173,14 +184,16 @@ impl<'ctx> Type<'ctx> {
     /// Given a type T, creates a new type of restrict T, which
     /// has the semantics of C's restrict.
     #[cfg(feature = "master")]
-    pub fn make_restrict(self) -> Option<Type<'ctx>> {
-        with_lib(&self, |lib| unsafe {
+    #[track_caller]
+    pub fn make_restrict(self) -> Type<'ctx> {
+        with_lib_handle(&self, |lib| unsafe {
             from_ptr(lib.gcc_jit_type_get_restrict(get_ptr(&self)))
         })
     }
 
-    pub fn get_aligned(self, alignment_in_bytes: u64) -> Option<Type<'ctx>> {
-        with_lib(&self, |lib| unsafe {
+    #[track_caller]
+    pub fn get_aligned(self, alignment_in_bytes: u64) -> Type<'ctx> {
+        with_lib_handle(&self, |lib| unsafe {
             from_ptr(lib.gcc_jit_type_get_aligned(get_ptr(&self), alignment_in_bytes as _))
         })
     }
@@ -240,8 +253,9 @@ impl<'ctx> Type<'ctx> {
         })
     }
 
-    pub fn unqualified(&self) -> Option<Type<'ctx>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn unqualified(&self) -> Type<'ctx> {
+        with_lib_handle(self, |lib| unsafe {
             from_ptr(lib.gcc_jit_type_unqualified(get_ptr(self)))
         })
     }
@@ -306,14 +320,16 @@ impl TypeAttribute {
 /// but it's also possible to implement this trait for more complex types
 /// that will use the API on Context to construct analagous struct/union types.
 pub trait Typeable {
-    fn get_type<'a, 'ctx>(ctx: &'a Context<'ctx>) -> Option<Type<'a>>;
+    #[track_caller]
+    fn get_type<'a, 'ctx>(ctx: &'a Context<'ctx>) -> Type<'a>;
 }
 
 macro_rules! typeable_def {
     ($ty:ty, $expr:expr) => {
         impl Typeable for $ty {
-            fn get_type<'a, 'ctx>(ctx: &'a Context<'ctx>) -> Option<Type<'a>> {
-                with_lib(ctx, |lib| unsafe {
+            #[track_caller]
+            fn get_type<'a, 'ctx>(ctx: &'a Context<'ctx>) -> Type<'a> {
+                with_lib_handle(ctx, |lib| unsafe {
                     let ctx_ptr = context::get_ptr(ctx);
                     let ptr = lib.gcc_jit_context_get_type(ctx_ptr, $expr);
                     from_ptr(ptr)
@@ -333,8 +349,9 @@ typeable_def!(usize, GCC_JIT_TYPE_SIZE_T);
 macro_rules! typeable_int_def {
     ($ty:ty, $num_bytes:expr, $signed:expr) => {
         impl Typeable for $ty {
-            fn get_type<'a, 'ctx>(ctx: &'a Context<'ctx>) -> Option<Type<'a>> {
-                with_lib(ctx, |lib| unsafe {
+            #[track_caller]
+            fn get_type<'a, 'ctx>(ctx: &'a Context<'ctx>) -> Type<'a> {
+                with_lib_handle(ctx, |lib| unsafe {
                     let ctx_ptr = context::get_ptr(ctx);
                     let ptr = lib.gcc_jit_context_get_int_type(ctx_ptr, $num_bytes, $signed as i32);
                     from_ptr(ptr)
@@ -361,8 +378,9 @@ typeable_int_def!(u64, 8, false);
 /// pointers that are not opaque to gcc. For that, the make_pointer
 /// function should be used.
 impl<T> Typeable for *mut T {
-    fn get_type<'a, 'ctx>(ctx: &'a Context<'ctx>) -> Option<Type<'a>> {
-        with_lib(ctx, |lib| unsafe {
+    #[track_caller]
+    fn get_type<'a, 'ctx>(ctx: &'a Context<'ctx>) -> Type<'a> {
+        with_lib_handle(ctx, |lib| unsafe {
             let ctx_ptr = context::get_ptr(ctx);
             let ptr = lib.gcc_jit_context_get_type(ctx_ptr, GCC_JIT_TYPE_VOID_PTR);
             from_ptr(ptr)
@@ -371,12 +389,14 @@ impl<T> Typeable for *mut T {
 }
 
 impl<T> Typeable for *const T {
-    fn get_type<'a, 'ctx>(ctx: &'a Context<'ctx>) -> Option<Type<'a>> {
-        with_lib(ctx, |lib| unsafe {
+    #[track_caller]
+    fn get_type<'a, 'ctx>(ctx: &'a Context<'ctx>) -> Type<'a> {
+        with_lib_handle(ctx, |lib| unsafe {
             let ctx_ptr = context::get_ptr(ctx);
             let ptr = lib.gcc_jit_context_get_type(ctx_ptr, GCC_JIT_TYPE_VOID_PTR);
-            from_ptr(ptr)?.make_const()
+            from_ptr(ptr)
         })
+        .make_const()
     }
 }
 

@@ -12,7 +12,7 @@ use object::{Object, ToObject};
 use rvalue;
 use rvalue::{RValue, ToRValue};
 
-use crate::{with_lib, with_lib_without_error_check};
+use crate::{with_lib, with_lib_handle, with_lib_without_error_check};
 
 #[cfg(feature = "master")]
 #[derive(Clone, Copy, Debug)]
@@ -171,16 +171,13 @@ impl<'ctx> ToRValue<'ctx> for LValue<'ctx> {
 impl<'ctx> LValue<'ctx> {
     /// Given an LValue x and a Field f, gets an LValue for the field
     /// access x.f.
-    pub fn access_field(
-        &self,
-        loc: Option<Location<'ctx>>,
-        field: Field<'ctx>,
-    ) -> Option<LValue<'ctx>> {
+    #[track_caller]
+    pub fn access_field(&self, loc: Option<Location<'ctx>>, field: Field<'ctx>) -> LValue<'ctx> {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             let ptr =
                 lib.gcc_jit_lvalue_access_field(get_ptr(self), loc_ptr, field::get_ptr(&field));
             from_ptr(ptr)
@@ -188,12 +185,13 @@ impl<'ctx> LValue<'ctx> {
     }
 
     /// Given an LValue x, returns the RValue address of x, akin to C's &x.
-    pub fn get_address(&self, loc: Option<Location<'ctx>>) -> Option<RValue<'ctx>> {
+    #[track_caller]
+    pub fn get_address(&self, loc: Option<Location<'ctx>>) -> RValue<'ctx> {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_lvalue_get_address(get_ptr(self), loc_ptr);
             rvalue::from_ptr(ptr)
         })
@@ -207,8 +205,9 @@ impl<'ctx> LValue<'ctx> {
     }
 
     /// Set the initialization value for a global variable.
-    pub fn global_set_initializer_rvalue(&self, value: RValue<'ctx>) -> Option<LValue<'ctx>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn global_set_initializer_rvalue(&self, value: RValue<'ctx>) -> LValue<'ctx> {
+        with_lib_handle(self, |lib| unsafe {
             from_ptr(
                 lib.gcc_jit_global_set_initializer_rvalue(get_ptr(self), rvalue::get_ptr(&value)),
             )

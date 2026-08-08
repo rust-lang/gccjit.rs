@@ -23,10 +23,9 @@ use target_info::{self, TargetInfo};
 use types;
 use Type;
 
-use crate::{with_lib, with_lib_without_error_check};
+use crate::{with_lib, with_lib_handle, with_lib_without_error_check};
 
 pub(crate) trait ContextGetter<'ctx> {
-    #[allow(dead_code)] // Only used with `#[cfg(debug_assertions)]`.
     fn context(&self) -> crate::ContextRef<'ctx>;
 }
 
@@ -318,12 +317,19 @@ impl<'ctx> Context<'ctx> {
     /// Compiles the context and returns a CompileResult that contains
     /// the means to access functions and globals that have currently
     /// been JIT compiled.
-    pub fn compile(&self) -> Option<CompileResult> {
-        with_lib(self, |lib| unsafe {
-            Some(CompileResult {
-                ptr: NonNull::new(lib.gcc_jit_context_compile(get_ptr(self)))?,
-            })
-        })
+    pub fn compile(&self) -> Result<CompileResult, String> {
+        let result = with_lib(self, |lib| unsafe {
+            NonNull::new(lib.gcc_jit_context_compile(get_ptr(self)))
+                .map(|ptr| CompileResult { ptr })
+        });
+        match result {
+            Some(result) => Ok(result),
+            None => Err(match self.get_last_error() {
+                Ok(Some(error)) => error.to_string(),
+                _ => "gcc_jit_context_compile failed (libgccjit recorded no error; see stderr)"
+                    .to_string(),
+            }),
+        }
     }
 
     /// Compiles the context and saves the result to a file. The
@@ -350,8 +356,9 @@ impl<'ctx> Context<'ctx> {
     /// Creates a new child context from this context. The child context
     /// is a fully-featured context, but it has a lifetime that is strictly
     /// less than the lifetime that spawned it.
-    pub fn new_child_context<'b>(&'b self) -> Option<Context<'b>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn new_child_context<'b>(&'b self) -> Context<'b> {
+        with_lib_handle(self, |lib| unsafe {
             Some(Context {
                 marker: PhantomData,
                 ptr: NonNull::new(lib.gcc_jit_context_new_child_context(get_ptr(self)))?,
@@ -359,15 +366,16 @@ impl<'ctx> Context<'ctx> {
         })
     }
 
+    #[track_caller]
     pub fn new_case<S: ToRValue<'ctx>, T: ToRValue<'ctx>>(
         &self,
         min_value: S,
         max_value: T,
         dest_block: Block<'ctx>,
-    ) -> Option<Case<'ctx>> {
+    ) -> Case<'ctx> {
         let min_value = min_value.to_rvalue();
         let max_value = max_value.to_rvalue();
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             Some(Case {
                 marker: PhantomData,
                 ptr: NonNull::new(lib.gcc_jit_context_new_case(
@@ -397,14 +405,15 @@ impl<'ctx> Context<'ctx> {
         })
     }
 
+    #[track_caller]
     pub fn new_global<'a, S: AsRef<str>>(
         &self,
         loc: Option<Location<'a>>,
         kind: GlobalKind,
         ty: Type<'a>,
         name: S,
-    ) -> Option<LValue<'a>> {
-        with_lib(self, |lib| unsafe {
+    ) -> LValue<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
@@ -426,19 +435,22 @@ impl<'ctx> Context<'ctx> {
     /// for some primitive types - utilizers of this library are encouraged
     /// to provide their own types that implement Typeable for ease of type
     /// creation.
-    pub fn new_type<'a, T: types::Typeable>(&'a self) -> Option<types::Type<'a>> {
+    #[track_caller]
+    pub fn new_type<'a, T: types::Typeable>(&'a self) -> types::Type<'a> {
         <T as types::Typeable>::get_type(self)
     }
 
-    pub fn new_c_type<'a>(&'a self, c_type: CType) -> Option<types::Type<'a>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn new_c_type<'a>(&'a self, c_type: CType) -> types::Type<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_get_type(get_ptr(self), c_type.to_sys());
             types::from_ptr(ptr)
         })
     }
 
-    pub fn new_int_type<'a>(&'a self, num_bytes: i32, signed: bool) -> Option<types::Type<'a>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn new_int_type<'a>(&'a self, num_bytes: i32, signed: bool) -> types::Type<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let ctx_ptr = get_ptr(self);
             let ptr = lib.gcc_jit_context_get_int_type(ctx_ptr, num_bytes, signed as i32);
             types::from_ptr(ptr)
@@ -447,18 +459,19 @@ impl<'ctx> Context<'ctx> {
 
     /// Constructs a new field with an optional source location, type, and name.
     /// This field can be used to compose unions or structs.
+    #[track_caller]
     pub fn new_field<'a, S: AsRef<str>>(
         &'a self,
         loc: Option<Location<'a>>,
         ty: types::Type<'a>,
         name: S,
-    ) -> Option<Field<'a>> {
+    ) -> Field<'a> {
         let name_ref = name.as_ref();
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             let cstr = CString::new(name_ref).unwrap();
             let ptr = lib.gcc_jit_context_new_field(
                 get_ptr(self),
@@ -472,17 +485,18 @@ impl<'ctx> Context<'ctx> {
 
     /// Constructs a new array type with a given base element type and a
     /// size.
+    #[track_caller]
     pub fn new_array_type<'a>(
         &'a self,
         loc: Option<Location<'a>>,
         ty: types::Type<'a>,
         num_elements: u64,
-    ) -> Option<types::Type<'a>> {
+    ) -> types::Type<'a> {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_array_type(
                 get_ptr(self),
                 loc_ptr,
@@ -496,17 +510,18 @@ impl<'ctx> Context<'ctx> {
     /// Constructs a new array type with a given base element type and a
     /// size.
     #[cfg(feature = "master")]
+    #[track_caller]
     pub fn new_array_type_u64<'a>(
         &'a self,
         loc: Option<Location<'a>>,
         ty: types::Type<'a>,
         num_elements: u64,
-    ) -> Option<types::Type<'a>> {
+    ) -> types::Type<'a> {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_array_type_u64(
                 get_ptr(self),
                 loc_ptr,
@@ -517,12 +532,9 @@ impl<'ctx> Context<'ctx> {
         })
     }
 
-    pub fn new_vector_type<'a>(
-        &'a self,
-        ty: types::Type<'a>,
-        num_units: u64,
-    ) -> Option<types::Type<'a>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn new_vector_type<'a>(&'a self, ty: types::Type<'a>, num_units: u64) -> types::Type<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_type_get_vector(types::get_ptr(&ty), num_units as _);
             types::from_ptr(ptr)
         })
@@ -531,19 +543,20 @@ impl<'ctx> Context<'ctx> {
     /// Constructs a new struct type with the given name, optional source location,
     /// and a list of fields. The returned struct is concrete and new fields cannot
     /// be added to it.
+    #[track_caller]
     pub fn new_struct_type<'a, S: AsRef<str>>(
         &'a self,
         loc: Option<Location<'a>>,
         name: S,
         fields: &[Field<'a>],
-    ) -> Option<Struct<'a>> {
+    ) -> Struct<'a> {
         let name_ref = name.as_ref();
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
         let num_fields = fields.len() as i32;
-        with_lib(self, |lib| {
+        with_lib_handle(self, |lib| {
             let mut fields_ptrs: Vec<_> = fields
                 .iter()
                 .map(|x| unsafe { field::get_ptr(x) })
@@ -564,17 +577,18 @@ impl<'ctx> Context<'ctx> {
 
     /// Constructs a new struct type whose fields are not known. Fields can
     /// be added to this struct later, but only once.
+    #[track_caller]
     pub fn new_opaque_struct_type<'a, S: AsRef<str>>(
         &'a self,
         loc: Option<Location<'a>>,
         name: S,
-    ) -> Option<Struct<'a>> {
+    ) -> Struct<'a> {
         let name_ref = name.as_ref();
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             let cstr = CString::new(name_ref).unwrap();
             let ptr = lib.gcc_jit_context_new_opaque_struct(get_ptr(self), loc_ptr, cstr.as_ptr());
             structs::from_ptr(ptr)
@@ -582,19 +596,20 @@ impl<'ctx> Context<'ctx> {
     }
 
     /// Creates a new union type from a set of fields.
+    #[track_caller]
     pub fn new_union_type<'a, S: AsRef<str>>(
         &'a self,
         loc: Option<Location<'a>>,
         name: S,
         fields: &[Field<'a>],
-    ) -> Option<types::Type<'a>> {
+    ) -> types::Type<'a> {
         let name_ref = name.as_ref();
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
         let num_fields = fields.len() as i32;
-        with_lib(self, |lib| {
+        with_lib_handle(self, |lib| {
             let mut fields_ptrs: Vec<_> = fields
                 .iter()
                 .map(|x| unsafe { field::get_ptr(x) })
@@ -617,19 +632,20 @@ impl<'ctx> Context<'ctx> {
     /// parameter types, and an optional location. The last flag can
     /// make the function variadic, although Rust can't really handle
     /// the varargs calling convention.
+    #[track_caller]
     pub fn new_function_pointer_type<'a>(
         &'a self,
         loc: Option<Location<'a>>,
         return_type: types::Type<'a>,
         param_types: &[types::Type<'a>],
         is_variadic: bool,
-    ) -> Option<types::Type<'a>> {
+    ) -> types::Type<'a> {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
         let num_types = param_types.len() as i32;
-        with_lib(self, |lib| {
+        with_lib_handle(self, |lib| {
             let mut types_ptrs: Vec<_> = param_types
                 .iter()
                 .map(|x| unsafe { types::get_ptr(x) })
@@ -650,6 +666,7 @@ impl<'ctx> Context<'ctx> {
 
     /// Creates a new function with the given function kind, return type, parameters, name,
     /// and whether or not the function is variadic.
+    #[track_caller]
     pub fn new_function<'a, S: AsRef<str>>(
         &'a self,
         loc: Option<Location<'a>>,
@@ -658,14 +675,14 @@ impl<'ctx> Context<'ctx> {
         params: &[Parameter<'a>],
         name: S,
         is_variadic: bool,
-    ) -> Option<Function<'a>> {
+    ) -> Function<'a> {
         let name_ref = name.as_ref();
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
         let num_params = params.len() as i32;
-        with_lib(self, |lib| {
+        with_lib_handle(self, |lib| {
             let mut params_ptrs: Vec<_> = params
                 .iter()
                 .map(|x| unsafe { parameter::get_ptr(x) })
@@ -688,6 +705,7 @@ impl<'ctx> Context<'ctx> {
     }
 
     /// Creates a new binary operation between two RValues and produces a new RValue.
+    #[track_caller]
     pub fn new_binary_op<'a, L: ToRValue<'a>, R: ToRValue<'a>>(
         &'a self,
         loc: Option<Location<'a>>,
@@ -695,14 +713,14 @@ impl<'ctx> Context<'ctx> {
         ty: types::Type<'a>,
         left: L,
         right: R,
-    ) -> Option<RValue<'a>> {
+    ) -> RValue<'a> {
         let left_rvalue = left.to_rvalue();
         let right_rvalue = right.to_rvalue();
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_binary_op(
                 get_ptr(self),
                 loc_ptr,
@@ -716,19 +734,20 @@ impl<'ctx> Context<'ctx> {
     }
 
     /// Creates a unary operation on one RValue and produces a result RValue.
+    #[track_caller]
     pub fn new_unary_op<'a, T: ToRValue<'a>>(
         &'a self,
         loc: Option<Location<'a>>,
         op: UnaryOp,
         ty: types::Type<'a>,
         target: T,
-    ) -> Option<RValue<'a>> {
+    ) -> RValue<'a> {
         let rvalue = target.to_rvalue();
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_unary_op(
                 get_ptr(self),
                 loc_ptr,
@@ -740,20 +759,21 @@ impl<'ctx> Context<'ctx> {
         })
     }
 
+    #[track_caller]
     pub fn new_comparison<'a, L: ToRValue<'a>, R: ToRValue<'a>>(
         &'a self,
         loc: Option<Location<'a>>,
         op: ComparisonOp,
         left: L,
         right: R,
-    ) -> Option<RValue<'a>> {
+    ) -> RValue<'a> {
         let left_rvalue = left.to_rvalue();
         let right_rvalue = right.to_rvalue();
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_comparison(
                 get_ptr(self),
                 loc_ptr,
@@ -773,18 +793,19 @@ impl<'ctx> Context<'ctx> {
     /// mix the types of the arguments it may be necessary to call to_rvalue()
     /// before calling this function.
     #[must_use]
+    #[track_caller]
     pub fn new_call<'a>(
         &'a self,
         loc: Option<Location<'a>>,
         func: Function<'a>,
         args: &[RValue<'a>],
-    ) -> Option<RValue<'a>> {
+    ) -> RValue<'a> {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
         let num_params = args.len() as i32;
-        with_lib(self, |lib| {
+        with_lib_handle(self, |lib| {
             let mut params_ptrs: Vec<_> =
                 args.iter().map(|x| unsafe { rvalue::get_ptr(x) }).collect();
             unsafe {
@@ -803,19 +824,20 @@ impl<'ctx> Context<'ctx> {
     /// Creates an indirect function call that dereferences a function pointer and
     /// attempts to invoke it with the given arguments. The RValue that is returned
     /// is the result of the function call.
+    #[track_caller]
     pub fn new_call_through_ptr<'a, F: ToRValue<'a>>(
         &'a self,
         loc: Option<Location<'a>>,
         fun_ptr: F,
         args: &[RValue<'a>],
-    ) -> Option<RValue<'a>> {
+    ) -> RValue<'a> {
         let fun_ptr_rvalue = fun_ptr.to_rvalue();
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
         let num_params = args.len() as i32;
-        with_lib(self, |lib| {
+        with_lib_handle(self, |lib| {
             let mut params_ptrs: Vec<_> = args
                 .iter()
                 .map(|x| x.to_rvalue())
@@ -835,18 +857,19 @@ impl<'ctx> Context<'ctx> {
     }
 
     /// Cast an RValue to a specific type. I don't know what happens when the cast fails yet.
+    #[track_caller]
     pub fn new_cast<'a, T: ToRValue<'a>>(
         &'a self,
         loc: Option<Location<'a>>,
         value: T,
         dest_type: types::Type<'a>,
-    ) -> Option<RValue<'a>> {
+    ) -> RValue<'a> {
         let rvalue = value.to_rvalue();
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_cast(
                 get_ptr(self),
                 loc_ptr,
@@ -858,18 +881,19 @@ impl<'ctx> Context<'ctx> {
     }
 
     /// Bitcast an RValue to a specific type.
+    #[track_caller]
     pub fn new_bitcast<'a, T: ToRValue<'a>>(
         &'a self,
         loc: Option<Location<'a>>,
         value: T,
         dest_type: types::Type<'a>,
-    ) -> Option<RValue<'a>> {
+    ) -> RValue<'a> {
         let rvalue = value.to_rvalue();
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_bitcast(
                 get_ptr(self),
                 loc_ptr,
@@ -883,18 +907,19 @@ impl<'ctx> Context<'ctx> {
     /// Read the next argument of a C-variadic function.
     ///
     /// Equivalent to the C `va_arg(*ap, arg_type)`.
+    #[track_caller]
     pub fn new_va_arg<'a, T: ToRValue<'a>>(
         &'a self,
         loc: Option<Location<'a>>,
         ap: T,
         arg_type: types::Type<'a>,
-    ) -> Option<RValue<'a>> {
+    ) -> RValue<'a> {
         let ap = ap.to_rvalue();
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_va_arg(
                 get_ptr(self),
                 loc_ptr,
@@ -907,19 +932,20 @@ impl<'ctx> Context<'ctx> {
 
     /// Creates an LValue from an array pointer and an offset. The LValue can be the target
     /// of an assignment, or it can be converted into an RValue (i.e. loaded).
+    #[track_caller]
     pub fn new_array_access<'a, A: ToRValue<'a>, I: ToRValue<'a>>(
         &'a self,
         loc: Option<Location<'a>>,
         array_ptr: A,
         index: I,
-    ) -> Option<LValue<'a>> {
+    ) -> LValue<'a> {
         let array_rvalue = array_ptr.to_rvalue();
         let idx_rvalue = index.to_rvalue();
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_array_access(
                 get_ptr(self),
                 loc_ptr,
@@ -931,12 +957,9 @@ impl<'ctx> Context<'ctx> {
     }
 
     /// Creates a new RValue from a given long value.
-    pub fn new_rvalue_from_long<'a>(
-        &'a self,
-        ty: types::Type<'a>,
-        value: i64,
-    ) -> Option<RValue<'a>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn new_rvalue_from_long<'a>(&'a self, ty: types::Type<'a>, value: i64) -> RValue<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_rvalue_from_long(
                 get_ptr(self),
                 types::get_ptr(&ty),
@@ -946,13 +969,14 @@ impl<'ctx> Context<'ctx> {
         })
     }
 
+    #[track_caller]
     pub fn new_rvalue_from_vector<'a>(
         &'a self,
         loc: Option<Location<'a>>,
         vec_type: types::Type<'a>,
         elements: &[RValue<'a>],
-    ) -> Option<RValue<'a>> {
-        with_lib(self, |lib| unsafe {
+    ) -> RValue<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
@@ -969,14 +993,15 @@ impl<'ctx> Context<'ctx> {
     }
 
     #[cfg(feature = "master")]
+    #[track_caller]
     pub fn new_rvalue_vector_perm<'a>(
         &'a self,
         loc: Option<Location<'a>>,
         elements1: RValue<'a>,
         elements2: RValue<'a>,
         mask: RValue<'a>,
-    ) -> Option<RValue<'a>> {
-        with_lib(self, |lib| unsafe {
+    ) -> RValue<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
@@ -994,14 +1019,15 @@ impl<'ctx> Context<'ctx> {
 
     //pub fn gcc_jit_context_new_union_constructor(ctxt: *mut gcc_jit_context, loc: *mut gcc_jit_location, typ: *mut gcc_jit_type, field: *mut gcc_jit_field, value: *mut gcc_jit_rvalue) -> *mut gcc_jit_rvalue;
 
+    #[track_caller]
     pub fn new_struct_constructor<'a>(
         &'a self,
         loc: Option<Location<'a>>,
         struct_type: types::Type<'a>,
         fields: Option<&[Field<'a>]>,
         values: &[RValue<'a>],
-    ) -> Option<RValue<'a>> {
-        with_lib(self, |lib| unsafe {
+    ) -> RValue<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
@@ -1023,13 +1049,14 @@ impl<'ctx> Context<'ctx> {
         })
     }
 
+    #[track_caller]
     pub fn new_array_constructor<'a>(
         &'a self,
         loc: Option<Location<'a>>,
         array_type: types::Type<'a>,
         elements: &[RValue<'a>],
-    ) -> Option<RValue<'a>> {
-        with_lib(self, |lib| unsafe {
+    ) -> RValue<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
@@ -1046,13 +1073,14 @@ impl<'ctx> Context<'ctx> {
     }
 
     #[cfg(feature = "master")]
+    #[track_caller]
     pub fn new_vector_access<'a>(
         &'a self,
         loc: Option<Location<'a>>,
         vector: RValue<'a>,
         index: RValue<'a>,
-    ) -> Option<LValue<'a>> {
-        with_lib(self, |lib| unsafe {
+    ) -> LValue<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
@@ -1069,13 +1097,14 @@ impl<'ctx> Context<'ctx> {
     }
 
     #[cfg(feature = "master")]
+    #[track_caller]
     pub fn convert_vector<'a>(
         &'a self,
         loc: Option<Location<'a>>,
         vector: RValue<'a>,
         type_: Type<'a>,
-    ) -> Option<RValue<'a>> {
-        with_lib(self, |lib| unsafe {
+    ) -> RValue<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
@@ -1091,12 +1120,9 @@ impl<'ctx> Context<'ctx> {
     }
 
     /// Creates a new RValue from a given int value.
-    pub fn new_rvalue_from_int<'a>(
-        &'a self,
-        ty: types::Type<'a>,
-        value: i32,
-    ) -> Option<RValue<'a>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn new_rvalue_from_int<'a>(&'a self, ty: types::Type<'a>, value: i32) -> RValue<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let ptr =
                 lib.gcc_jit_context_new_rvalue_from_int(get_ptr(self), types::get_ptr(&ty), value);
             rvalue::from_ptr(ptr)
@@ -1104,12 +1130,9 @@ impl<'ctx> Context<'ctx> {
     }
 
     /// Creates a new RValue from a given double value.
-    pub fn new_rvalue_from_double<'a>(
-        &'a self,
-        ty: types::Type<'a>,
-        value: f64,
-    ) -> Option<RValue<'a>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn new_rvalue_from_double<'a>(&'a self, ty: types::Type<'a>, value: f64) -> RValue<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_rvalue_from_double(
                 get_ptr(self),
                 types::get_ptr(&ty),
@@ -1120,16 +1143,18 @@ impl<'ctx> Context<'ctx> {
     }
 
     /// Creates a zero element for a given type.
-    pub fn new_rvalue_zero<'a>(&'a self, ty: types::Type<'a>) -> Option<RValue<'a>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn new_rvalue_zero<'a>(&'a self, ty: types::Type<'a>) -> RValue<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_zero(get_ptr(self), types::get_ptr(&ty));
             rvalue::from_ptr(ptr)
         })
     }
 
     /// Creates a one element for a given type.
-    pub fn new_rvalue_one<'a>(&'a self, ty: types::Type<'a>) -> Option<RValue<'a>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn new_rvalue_one<'a>(&'a self, ty: types::Type<'a>) -> RValue<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_one(get_ptr(self), types::get_ptr(&ty));
             rvalue::from_ptr(ptr)
         })
@@ -1139,12 +1164,9 @@ impl<'ctx> Context<'ctx> {
     /// requires that the lifetime of the pointer be greater
     /// than that of the jitted program.
     #[allow(clippy::not_unsafe_ptr_arg_deref)]
-    pub fn new_rvalue_from_ptr<'a>(
-        &'a self,
-        ty: types::Type<'a>,
-        value: *mut (),
-    ) -> Option<RValue<'a>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn new_rvalue_from_ptr<'a>(&'a self, ty: types::Type<'a>, value: *mut ()) -> RValue<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_rvalue_from_ptr(
                 get_ptr(self),
                 types::get_ptr(&ty),
@@ -1155,16 +1177,18 @@ impl<'ctx> Context<'ctx> {
     }
 
     /// Creates a null RValue.
-    pub fn new_null<'a>(&'a self, ty: types::Type<'a>) -> Option<RValue<'a>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn new_null<'a>(&'a self, ty: types::Type<'a>) -> RValue<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_null(get_ptr(self), types::get_ptr(&ty));
             rvalue::from_ptr(ptr)
         })
     }
 
     /// Creates a string literal RValue.
-    pub fn new_string_literal<'a, S: AsRef<str>>(&'a self, value: S) -> Option<RValue<'a>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn new_string_literal<'a, S: AsRef<str>>(&'a self, value: S) -> RValue<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let cstr = CString::new(value.as_ref()).unwrap();
             let ptr = lib.gcc_jit_context_new_string_literal(get_ptr(self), cstr.as_ptr());
             rvalue::from_ptr(ptr)
@@ -1173,8 +1197,9 @@ impl<'ctx> Context<'ctx> {
 
     #[cfg(feature = "master")]
     /// Creates a new RValue from a sizeof(type).
-    pub fn new_sizeof<'a>(&'a self, ty: types::Type<'a>) -> Option<RValue<'a>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn new_sizeof<'a>(&'a self, ty: types::Type<'a>) -> RValue<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_sizeof(get_ptr(self), types::get_ptr(&ty));
             rvalue::from_ptr(ptr)
         })
@@ -1182,8 +1207,9 @@ impl<'ctx> Context<'ctx> {
 
     #[cfg(feature = "master")]
     /// Creates a new RValue from a _Alignof(type).
-    pub fn new_alignof<'a>(&'a self, ty: types::Type<'a>) -> Option<RValue<'a>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn new_alignof<'a>(&'a self, ty: types::Type<'a>) -> RValue<'a> {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_context_new_alignof(get_ptr(self), types::get_ptr(&ty));
             rvalue::from_ptr(ptr)
         })
@@ -1213,18 +1239,19 @@ impl<'ctx> Context<'ctx> {
     }
 
     /// Creates a new parameter with a given type, name, and location.
+    #[track_caller]
     pub fn new_parameter<'a, S: AsRef<str>>(
         &'a self,
         loc: Option<Location<'a>>,
         ty: types::Type<'a>,
         name: S,
-    ) -> Option<Parameter<'a>> {
+    ) -> Parameter<'a> {
         let name_ref = name.as_ref();
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             let cstr = CString::new(name_ref).unwrap();
             let ptr = lib.gcc_jit_context_new_param(
                 get_ptr(self),
@@ -1239,9 +1266,10 @@ impl<'ctx> Context<'ctx> {
     /// Get a builtin function from gcc. It's not clear what functions are
     /// builtin and you'll likely need to consult the GCC internal docs
     /// for a full list.
-    pub fn get_builtin_function<'a, S: AsRef<str>>(&'a self, name: S) -> Option<Function<'a>> {
+    #[track_caller]
+    pub fn get_builtin_function<'a, S: AsRef<str>>(&'a self, name: S) -> Function<'a> {
         let name_ref = name.as_ref();
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             let cstr = CString::new(name_ref).unwrap();
             let ptr = lib.gcc_jit_context_get_builtin_function(get_ptr(self), cstr.as_ptr());
             function::from_ptr(ptr)
@@ -1252,12 +1280,10 @@ impl<'ctx> Context<'ctx> {
     /// Get a target-dependant builtin function from gcc. It's not clear what functions are
     /// builtin and you'll likely need to consult the GCC internal docs
     /// for a full list.
-    pub fn get_target_builtin_function<'a, S: AsRef<str>>(
-        &'a self,
-        name: S,
-    ) -> Option<Function<'a>> {
+    #[track_caller]
+    pub fn get_target_builtin_function<'a, S: AsRef<str>>(&'a self, name: S) -> Function<'a> {
         let name_ref = name.as_ref();
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             let cstr = CString::new(name_ref).unwrap();
             let ptr = lib.gcc_jit_context_get_target_builtin_function(get_ptr(self), cstr.as_ptr());
             function::from_ptr(ptr)
@@ -1370,27 +1396,25 @@ mod tests {
     #[test]
     fn create_field() {
         let ctx = Context::default();
-        let int_type = ctx.new_type::<i32>().unwrap();
+        let int_type = ctx.new_type::<i32>();
         let _int_field = ctx.new_field(None, int_type, "x");
     }
 
     #[test]
     fn basic_function() {
         let context = Context::default();
-        let int_ty = context.new_type::<i32>().unwrap();
-        let parameter = context.new_parameter(None, int_ty, "x").unwrap();
-        let fun = context
-            .new_function(
-                None,
-                FunctionType::Exported,
-                int_ty,
-                &[parameter],
-                "square",
-                false,
-            )
-            .unwrap();
-        let block = fun.new_block("main_block").unwrap();
-        let parm = fun.get_param(0).unwrap().to_rvalue();
+        let int_ty = context.new_type::<i32>();
+        let parameter = context.new_parameter(None, int_ty, "x");
+        let fun = context.new_function(
+            None,
+            FunctionType::Exported,
+            int_ty,
+            &[parameter],
+            "square",
+            false,
+        );
+        let block = fun.new_block("main_block");
+        let parm = fun.get_param(0).to_rvalue();
         let square = parm * parm;
         block.end_with_return(None, square);
 

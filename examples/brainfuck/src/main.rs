@@ -59,71 +59,71 @@ fn read_ops<R: io::Read>(mut reader: R) -> Result<Vec<Op>, io::Error> {
 
 fn codegen<'a, 'ctx>(ops: &[Op], context: &'a gccjit::Context<'ctx>) -> bool {
     // first we set up the function so that it has signature () -> void.
-    let void_ty = context.new_type::<()>().unwrap();
-    let char_ty = context.new_type::<u8>().unwrap();
-    let int_ty = context.new_type::<i32>().unwrap();
+    let void_ty = context.new_type::<()>();
+    let char_ty = context.new_type::<u8>();
+    let int_ty = context.new_type::<i32>();
     // before we get started - get a reference to getchar, putchar, and memset.
     let getchar = context.new_function(None,
                                        gccjit::FunctionType::Extern,
                                        char_ty,
                                        &[],
                                        "getchar",
-                                       false).unwrap();
-    let parameter = context.new_parameter(None, char_ty, "c").unwrap();
+                                       false);
+    let parameter = context.new_parameter(None, char_ty, "c");
     let putchar = context.new_function(None,
                                        gccjit::FunctionType::Extern,
                                        void_ty,
                                        &[parameter],
                                        "putchar",
-                                       false).unwrap();
-    let memory_ty = context.new_array_type(None, char_ty, MEMORY_SIZE).unwrap();
+                                       false);
+    let memory_ty = context.new_array_type(None, char_ty, MEMORY_SIZE);
     // memset definition - going to cheat a little bit and not give the C definition since
     // gcc's backend doesn't have C's notion of implicit type conversions (i.e. unsigned char[] to void*)
-    let char_ptr = context.new_type::<u8>().unwrap().make_pointer().unwrap();
-    let void_param = context.new_parameter(None, char_ptr, "ptr").unwrap();
+    let char_ptr = context.new_type::<u8>().make_pointer();
+    let void_param = context.new_parameter(None, char_ptr, "ptr");
     // also here - we're lying a bit and saying that int == size_t. This obviously isn't always true
     // but it's good enough for this toy program.
-    let size_t_param = context.new_parameter(None, int_ty, "size").unwrap();
-    let int_param = context.new_parameter(None, int_ty, "num").unwrap();
-    let void_ptr_ty = context.new_type::<*mut ()>().unwrap();
+    let size_t_param = context.new_parameter(None, int_ty, "size");
+    let int_param = context.new_parameter(None, int_ty, "num");
+    let void_ptr_ty = context.new_type::<*mut ()>();
     let memset = context.new_function(None,
                                       gccjit::FunctionType::Extern,
                                       void_ptr_ty,
                                       &[void_param, int_param, size_t_param],
                                       "memset",
-                                      false).unwrap();
+                                      false);
 
-    let brainf_main = context.new_function(None, gccjit::FunctionType::Exported, void_ty, &[], "bf_main", false).unwrap();
+    let brainf_main = context.new_function(None, gccjit::FunctionType::Exported, void_ty, &[], "bf_main", false);
     // next, we set up the brainfuck memory array.
-    let size = context.new_rvalue_from_int(int_ty, MEMORY_SIZE as _).unwrap();
-    let array = brainf_main.new_local(None, memory_ty, "memory").unwrap();
-    let memory_ptr = brainf_main.new_local(None, int_ty, "memory_ptr").unwrap();
-    let mut current_block = brainf_main.new_block("entry_block").unwrap();
+    let size = context.new_rvalue_from_int(int_ty, MEMORY_SIZE as _);
+    let array = brainf_main.new_local(None, memory_ty, "memory");
+    let memory_ptr = brainf_main.new_local(None, int_ty, "memory_ptr");
+    let mut current_block = brainf_main.new_block("entry_block");
     // now we have to zero out the giant buffer we just allocated on the stack.
-    let zero_access = context.new_array_access(None, array.to_rvalue(), context.new_rvalue_zero(int_ty).unwrap()).unwrap();
+    let zero_access = context.new_array_access(None, array.to_rvalue(), context.new_rvalue_zero(int_ty));
     // A function call that is done for its side effects must be sent to add_eval.
-    current_block.add_eval(None, context.new_call(None, memset, &[zero_access.get_address(None).unwrap(), context.new_rvalue_zero(int_ty).unwrap(), size]).unwrap());
+    current_block.add_eval(None, context.new_call(None, memset, &[zero_access.get_address(None), context.new_rvalue_zero(int_ty), size]));
     let mut block_stack = vec![];
     let mut blocks = 0;
     for op in ops.iter() {
         match *op {
             Op::Inc => {
                 // memory[ptr] += 1
-                let access = context.new_array_access(None, array.to_rvalue(), memory_ptr.to_rvalue()).unwrap();
-                current_block.add_assignment_op(None, access, gccjit::BinaryOp::Plus, context.new_rvalue_one(char_ty).unwrap());
+                let access = context.new_array_access(None, array.to_rvalue(), memory_ptr.to_rvalue());
+                current_block.add_assignment_op(None, access, gccjit::BinaryOp::Plus, context.new_rvalue_one(char_ty));
             },
             Op::Dec => {
                 // memory[ptr] -=
-                let access = context.new_array_access(None, array.to_rvalue(), memory_ptr.to_rvalue()).unwrap();
-                current_block.add_assignment_op(None, access, gccjit::BinaryOp::Minus, context.new_rvalue_one(char_ty).unwrap());
+                let access = context.new_array_access(None, array.to_rvalue(), memory_ptr.to_rvalue());
+                current_block.add_assignment_op(None, access, gccjit::BinaryOp::Minus, context.new_rvalue_one(char_ty));
             },
             Op::ShiftLeft => {
                 // ptr -= 1                
-                current_block.add_assignment_op(None, memory_ptr, gccjit::BinaryOp::Minus, context.new_rvalue_one(int_ty).unwrap());
+                current_block.add_assignment_op(None, memory_ptr, gccjit::BinaryOp::Minus, context.new_rvalue_one(int_ty));
             },
             Op::ShiftRight => {
                 // ptr += 1
-                current_block.add_assignment_op(None, memory_ptr, gccjit::BinaryOp::Plus, context.new_rvalue_one(int_ty).unwrap());
+                current_block.add_assignment_op(None, memory_ptr, gccjit::BinaryOp::Plus, context.new_rvalue_one(int_ty));
             },
             Op::BranchLeft => {
                 // this is the opening bracket. This represents the start of two
@@ -131,9 +131,9 @@ fn codegen<'a, 'ctx>(ops: &[Op], context: &'a gccjit::Context<'ctx>) -> bool {
                 // one that will be codegen'd next) is branched to when memory[ptr]
                 // is not zero. We will create the other block now but will put
                 // it on the block stack.
-                let cond_block = brainf_main.new_block(&*format!("block{}", blocks)).unwrap();
-                let true_block = brainf_main.new_block(&*format!("block{}", blocks + 1)).unwrap();
-                let false_block = brainf_main.new_block(&*format!("block{}", blocks + 2)).unwrap();
+                let cond_block = brainf_main.new_block(&*format!("block{}", blocks));
+                let true_block = brainf_main.new_block(&*format!("block{}", blocks + 1));
+                let false_block = brainf_main.new_block(&*format!("block{}", blocks + 2));
                 blocks += 3;
                 // end the current block with a jump to the conditional block.
                 current_block.end_with_jump(None, cond_block);
@@ -142,11 +142,11 @@ fn codegen<'a, 'ctx>(ops: &[Op], context: &'a gccjit::Context<'ctx>) -> bool {
 
                 // end the condition block with a jump to the true_block if
                 // mem[ptr] != 0, false_block otherwise
-                let access = context.new_array_access(None, array.to_rvalue(), memory_ptr.to_rvalue()).unwrap().to_rvalue();
+                let access = context.new_array_access(None, array.to_rvalue(), memory_ptr.to_rvalue()).to_rvalue();
                 let cond = context.new_comparison(None,
                                                   gccjit::ComparisonOp::NotEquals,
                                                   access,
-                                                  context.new_rvalue_zero(char_ty).unwrap()).unwrap();
+                                                  context.new_rvalue_zero(char_ty));
                 current_block.end_with_conditional(None, cond, true_block, false_block);
                 // now we are going to codegen the true branch.
                 current_block = true_block;
@@ -166,13 +166,13 @@ fn codegen<'a, 'ctx>(ops: &[Op], context: &'a gccjit::Context<'ctx>) -> bool {
                 current_block = next_block;
             }
             Op::Input => {
-                let access = context.new_array_access(None, array.to_rvalue(), memory_ptr.to_rvalue()).unwrap();
-                let chr = context.new_call(None, getchar, &[]).unwrap();
+                let access = context.new_array_access(None, array.to_rvalue(), memory_ptr.to_rvalue());
+                let chr = context.new_call(None, getchar, &[]);
                 current_block.add_assignment(None, access, chr);
             },
             Op::Output => {
-                let access = context.new_array_access(None, array.to_rvalue(), memory_ptr.to_rvalue()).unwrap();
-                let call = context.new_call(None, putchar, &[access.to_rvalue()]).unwrap();
+                let access = context.new_array_access(None, array.to_rvalue(), memory_ptr.to_rvalue());
+                let call = context.new_call(None, putchar, &[access.to_rvalue()]);
                 current_block.add_eval(None, call);
             }
         }

@@ -22,7 +22,7 @@ use std::ffi::CString;
 use types;
 use types::Type;
 
-use crate::{with_lib, with_lib_without_error_check};
+use crate::{with_lib, with_lib_handle, with_lib_without_error_check};
 
 /// FunctionType informs gccjit what sort of function a new function will be.
 /// An exported function is a function that will be exported using the CompileResult
@@ -241,8 +241,9 @@ impl<'ctx> crate::ContextGetter<'ctx> for Function<'ctx> {
 }
 
 impl<'ctx> Function<'ctx> {
-    pub fn get_param(&self, idx: i32) -> Option<Parameter<'ctx>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn get_param(&self, idx: i32) -> Parameter<'ctx> {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_function_get_param(get_ptr(self), idx);
             parameter::from_ptr(ptr)
         })
@@ -254,14 +255,16 @@ impl<'ctx> Function<'ctx> {
         })
     }
 
-    pub fn get_return_type(&self) -> Option<Type<'ctx>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn get_return_type(&self) -> Type<'ctx> {
+        with_lib_handle(self, |lib| unsafe {
             types::from_ptr(lib.gcc_jit_function_get_return_type(get_ptr(self)))
         })
     }
 
-    pub fn get_address(&self, loc: Option<Location<'ctx>>) -> Option<RValue<'ctx>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn get_address(&self, loc: Option<Location<'ctx>>) -> RValue<'ctx> {
+        with_lib_handle(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
@@ -278,8 +281,9 @@ impl<'ctx> Function<'ctx> {
         })
     }
 
-    pub fn new_block<S: AsRef<str>>(&self, name: S) -> Option<Block<'ctx>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn new_block<S: AsRef<str>>(&self, name: S) -> Block<'ctx> {
+        with_lib_handle(self, |lib| unsafe {
             let cstr = CString::new(name.as_ref()).unwrap();
             let ptr = lib.gcc_jit_function_new_block(get_ptr(self), cstr.as_ptr());
             block::from_ptr(ptr)
@@ -287,8 +291,9 @@ impl<'ctx> Function<'ctx> {
     }
 
     #[cfg(feature = "master")]
-    pub fn new_region(&self, loc: Option<Location<'ctx>>) -> Option<Region<'ctx>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn new_region(&self, loc: Option<Location<'ctx>>) -> Region<'ctx> {
+        with_lib_handle(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
@@ -308,13 +313,14 @@ impl<'ctx> Function<'ctx> {
         })
     }
 
+    #[track_caller]
     pub fn new_local<S: AsRef<str>>(
         &self,
         loc: Option<Location<'ctx>>,
         ty: Type<'ctx>,
         name: S,
-    ) -> Option<LValue<'ctx>> {
-        with_lib(self, |lib| unsafe {
+    ) -> LValue<'ctx> {
+        with_lib_handle(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),
@@ -331,8 +337,9 @@ impl<'ctx> Function<'ctx> {
     }
 
     #[cfg(feature = "master")]
-    pub fn new_temp(&self, loc: Option<Location<'ctx>>, ty: Type<'ctx>) -> Option<LValue<'ctx>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn new_temp(&self, loc: Option<Location<'ctx>>, ty: Type<'ctx>) -> LValue<'ctx> {
+        with_lib_handle(self, |lib| unsafe {
             let loc_ptr = match loc {
                 Some(loc) => location::get_ptr(&loc),
                 None => ptr::null_mut(),

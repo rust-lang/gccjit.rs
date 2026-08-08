@@ -6,7 +6,7 @@ use std::ptr::NonNull;
 use block::{self, Block};
 use context::Context;
 
-use crate::{with_lib, with_lib_without_error_check};
+use crate::{expect_handle_without_context, with_lib, with_lib_without_error_check};
 
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct Region<'ctx> {
@@ -21,12 +21,14 @@ impl<'ctx> fmt::Debug for Region<'ctx> {
 }
 
 impl<'ctx> Region<'ctx> {
-    pub fn new_block<S: AsRef<str>>(&self, name: S) -> Option<Block<'ctx>> {
-        with_lib_without_error_check(|lib| unsafe {
+    #[track_caller]
+    pub fn new_block<S: AsRef<str>>(&self, name: S) -> Block<'ctx> {
+        let handle = with_lib_without_error_check(|lib| unsafe {
             let cstr = CString::new(name.as_ref()).unwrap();
             let ptr = lib.gcc_jit_region_new_block(get_ptr(self), cstr.as_ptr());
             block::from_ptr(ptr)
-        })
+        });
+        expect_handle_without_context(handle, "gcc_jit_region_new_block")
     }
 
     pub fn add_block(&self, blk: Block<'ctx>) {

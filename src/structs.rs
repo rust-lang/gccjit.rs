@@ -11,7 +11,9 @@ use object::{Object, ToObject};
 use types;
 use types::Type;
 
-use crate::{with_lib, with_lib_without_error_check};
+use crate::{
+    expect_handle_without_context, with_lib, with_lib_handle, with_lib_without_error_check,
+};
 
 /// A Struct is gccjit's representation of a composite type. Despite the name,
 /// Struct can represent either a struct, an union, or an opaque named type.
@@ -22,11 +24,15 @@ pub struct Struct<'ctx> {
 }
 
 impl<'ctx> Struct<'ctx> {
-    pub fn as_type(&self) -> Option<Type<'ctx>> {
-        with_lib_without_error_check(|lib| unsafe {
+    #[track_caller]
+    pub fn as_type(&self) -> Type<'ctx> {
+        let handle = with_lib_without_error_check(|lib| unsafe {
             let ptr = lib.gcc_jit_struct_as_type(get_ptr(self));
             types::from_ptr(ptr)
-        })
+        });
+        // `Struct`'s context is reached *through* `as_type`, so querying it here
+        // would recurse; `gcc_jit_struct_as_type` cannot fail anyway.
+        expect_handle_without_context(handle, "gcc_jit_struct_as_type")
     }
 
     pub fn set_fields(&self, location: Option<Location<'ctx>>, fields: &[Field<'ctx>]) {
@@ -51,13 +57,10 @@ impl<'ctx> Struct<'ctx> {
         });
     }
 
-    pub fn get_field(&self, index: i32) -> Option<Field<'ctx>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn get_field(&self, index: i32) -> Field<'ctx> {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_struct_get_field(get_ptr(self), index);
-            #[cfg(debug_assertions)]
-            if ptr.is_null() {
-                panic!("Null ptr in get_field() from struct: {:?}", self);
-            }
             field::from_ptr(ptr)
         })
     }
@@ -71,7 +74,7 @@ impl<'ctx> Struct<'ctx> {
 
 impl<'ctx> ToObject<'ctx> for Struct<'ctx> {
     fn to_object(&self) -> Object<'ctx> {
-        let ty = self.as_type().expect("Failed Struct to Type conversion");
+        let ty = self.as_type();
         ty.to_object()
     }
 }

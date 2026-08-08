@@ -16,7 +16,7 @@ use std::ptr::{self, NonNull};
 use types;
 use types::Type;
 
-use crate::{with_lib, with_lib_without_error_check};
+use crate::{with_lib, with_lib_handle, with_lib_without_error_check};
 
 /// An RValue is a value that may or may not have a storage address in gccjit.
 /// RValues can be dereferenced, used for field accesses, and are the parameters
@@ -66,12 +66,13 @@ macro_rules! binary_operator_for {
         impl<'ctx> $ty for RValue<'ctx> {
             type Output = RValue<'ctx>;
 
+            #[track_caller]
             fn $name(self, rhs: RValue<'ctx>) -> RValue<'ctx> {
-                with_lib(&self, |lib| unsafe {
+                let ty = rhs.get_type();
+                with_lib_handle(&self, |lib| unsafe {
                     let rhs_rvalue = rhs.to_rvalue();
                     let obj_ptr = object::get_ptr(&self.to_object());
                     let ctx_ptr = lib.gcc_jit_object_get_context(obj_ptr);
-                    let ty = rhs.get_type()?;
                     let ptr = lib.gcc_jit_context_new_binary_op(
                         ctx_ptr,
                         ptr::null_mut(),
@@ -82,7 +83,6 @@ macro_rules! binary_operator_for {
                     );
                     from_ptr(ptr)
                 })
-                .expect("RValue operation failed")
             }
         }
     };
@@ -102,8 +102,9 @@ binary_operator_for!(Shr<RValue<'ctx>>, shr, BinaryOp::RShift);
 
 impl<'ctx> RValue<'ctx> {
     /// Gets the type of this RValue.
-    pub fn get_type(&self) -> Option<Type<'ctx>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn get_type(&self) -> Type<'ctx> {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_rvalue_get_type(get_ptr(self));
             types::from_ptr(ptr)
         })
@@ -129,16 +130,13 @@ impl<'ctx> RValue<'ctx> {
 
     /// Given an RValue x and a Field f, returns an RValue representing
     /// C's x.f.
-    pub fn access_field(
-        &self,
-        loc: Option<Location<'ctx>>,
-        field: Field<'ctx>,
-    ) -> Option<RValue<'ctx>> {
+    #[track_caller]
+    pub fn access_field(&self, loc: Option<Location<'ctx>>, field: Field<'ctx>) -> RValue<'ctx> {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             let ptr =
                 lib.gcc_jit_rvalue_access_field(get_ptr(self), loc_ptr, field::get_ptr(&field));
             from_ptr(ptr)
@@ -147,16 +145,17 @@ impl<'ctx> RValue<'ctx> {
 
     /// Given an RValue x and a Field f, returns an LValue representing
     /// C's x->f.
+    #[track_caller]
     pub fn dereference_field(
         &self,
         loc: Option<Location<'ctx>>,
         field: Field<'ctx>,
-    ) -> Option<LValue<'ctx>> {
+    ) -> LValue<'ctx> {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_rvalue_dereference_field(
                 get_ptr(self),
                 loc_ptr,
@@ -167,12 +166,13 @@ impl<'ctx> RValue<'ctx> {
     }
 
     /// Given a RValue x, returns an RValue that represents *x.
-    pub fn dereference(&self, loc: Option<Location<'ctx>>) -> Option<LValue<'ctx>> {
+    #[track_caller]
+    pub fn dereference(&self, loc: Option<Location<'ctx>>) -> LValue<'ctx> {
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_rvalue_dereference(get_ptr(self), loc_ptr);
             lvalue::from_ptr(ptr)
         })

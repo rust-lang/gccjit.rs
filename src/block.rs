@@ -16,7 +16,7 @@ use object::{self, Object, ToObject};
 use region::{self, Region};
 use rvalue::{self, ToRValue};
 
-use crate::{with_lib, with_lib_without_error_check};
+use crate::{with_lib, with_lib_handle, with_lib_without_error_check};
 
 /// BinaryOp is a enum representing the various binary operations
 /// that gccjit knows how to codegen.
@@ -102,12 +102,13 @@ impl<'ctx> Block<'ctx> {
     }
 
     #[cfg(feature = "master")]
-    pub fn get_successors(&self) -> Option<Vec<Block<'ctx>>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn get_successors(&self) -> Vec<Block<'ctx>> {
+        with_lib_handle(self, |lib| unsafe {
             let count = lib.gcc_jit_block_get_successor_count(get_ptr(self));
             (0..count)
                 .map(|index| from_ptr(lib.gcc_jit_block_get_successor(get_ptr(self), index)))
-                .collect()
+                .collect::<Option<Vec<_>>>()
         })
     }
 
@@ -360,17 +361,18 @@ impl<'ctx> Block<'ctx> {
         }
     }
 
+    #[track_caller]
     pub fn add_extended_asm(
         &self,
         loc: Option<Location<'ctx>>,
         asm_template: &str,
-    ) -> Option<ExtendedAsm<'ctx>> {
+    ) -> ExtendedAsm<'ctx> {
         let asm_template = CString::new(asm_template).unwrap();
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
             None => ptr::null_mut(),
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             ExtendedAsm::from_ptr(lib.gcc_jit_block_add_extended_asm(
                 get_ptr(self),
                 loc_ptr,
@@ -379,13 +381,14 @@ impl<'ctx> Block<'ctx> {
         })
     }
 
+    #[track_caller]
     pub fn end_with_extended_asm_goto(
         &self,
         loc: Option<Location<'ctx>>,
         asm_template: &str,
         goto_blocks: &[Block<'ctx>],
         fallthrough_block: Option<Block<'ctx>>,
-    ) -> Option<ExtendedAsm<'ctx>> {
+    ) -> ExtendedAsm<'ctx> {
         let asm_template = CString::new(asm_template).unwrap();
         let loc_ptr = match loc {
             Some(loc) => unsafe { location::get_ptr(&loc) },
@@ -395,7 +398,7 @@ impl<'ctx> Block<'ctx> {
             Some(ref block) => unsafe { get_ptr(block) },
             None => ptr::null_mut(),
         };
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             ExtendedAsm::from_ptr(lib.gcc_jit_block_end_with_extended_asm_goto(
                 get_ptr(self),
                 loc_ptr,
@@ -409,11 +412,12 @@ impl<'ctx> Block<'ctx> {
 }
 
 #[cfg(feature = "master")]
-pub fn clone_blocks<'ctx>(blocks: &[Block<'ctx>]) -> Option<Vec<Block<'ctx>>> {
+#[track_caller]
+pub fn clone_blocks<'ctx>(blocks: &[Block<'ctx>]) -> Vec<Block<'ctx>> {
     if blocks.is_empty() {
-        return Some(Vec::new());
+        return Vec::new();
     }
-    with_lib(&blocks[0], |lib| {
+    with_lib_handle(&blocks[0], |lib| {
         let mut src: Vec<_> = blocks
             .iter()
             .map(|block| unsafe { get_ptr(block) })
@@ -421,7 +425,9 @@ pub fn clone_blocks<'ctx>(blocks: &[Block<'ctx>]) -> Option<Vec<Block<'ctx>>> {
         let mut dst: Vec<*mut gccjit_sys::gcc_jit_block> = vec![ptr::null_mut(); blocks.len()];
         unsafe {
             lib.gcc_jit_blocks_clone(src.len() as c_int, src.as_mut_ptr(), dst.as_mut_ptr());
-            dst.into_iter().map(|ptr| from_ptr(ptr)).collect()
+            dst.into_iter()
+                .map(|ptr| from_ptr(ptr))
+                .collect::<Option<Vec<_>>>()
         }
     })
 }
