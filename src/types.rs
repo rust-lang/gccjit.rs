@@ -46,6 +46,14 @@ impl<'ctx> crate::ContextGetter<'ctx> for VectorType<'ctx> {
     }
 }
 
+#[cfg(feature = "master")]
+impl<'ctx> fmt::Debug for VectorType<'ctx> {
+    fn fmt<'a>(&self, fmt: &mut fmt::Formatter<'a>) -> Result<(), fmt::Error> {
+        let obj = self.to_object();
+        obj.fmt(fmt)
+    }
+}
+
 impl<'ctx> VectorType<'ctx> {
     unsafe fn from_ptr(ptr: *mut gccjit_sys::gcc_jit_vector_type) -> Option<VectorType<'ctx>> {
         Some(VectorType {

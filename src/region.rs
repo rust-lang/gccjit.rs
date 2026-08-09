@@ -6,6 +6,7 @@ use std::ptr::NonNull;
 use block::{self, Block};
 use context::Context;
 
+use crate::object::ToObject;
 use crate::{with_lib, with_lib_handle, with_lib_without_error_check};
 
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
@@ -25,15 +26,14 @@ impl<'ctx> crate::ToObject<'ctx> for Region<'ctx> {
 
 impl<'ctx> crate::ContextGetter<'ctx> for Region<'ctx> {
     fn context(&self) -> crate::ContextRef<'ctx> {
-        use crate::object::ToObject;
-
         self.to_object().context()
     }
 }
 
 impl<'ctx> fmt::Debug for Region<'ctx> {
     fn fmt<'a>(&self, fmt: &mut fmt::Formatter<'a>) -> Result<(), fmt::Error> {
-        unsafe { write!(fmt, "Region ({:?})", get_ptr(self)) }
+        let obj = self.to_object();
+        obj.fmt(fmt)
     }
 }
 
