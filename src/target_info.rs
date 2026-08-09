@@ -2,12 +2,13 @@ use context::CType;
 use std::{
     ffi::{CStr, CString},
     fmt,
+    ptr::NonNull,
 };
 
-use crate::with_lib_without_error_check;
+use crate::{expect_handle_without_context, with_lib_without_error_check};
 
 pub struct TargetInfo {
-    ptr: *mut gccjit_sys::gcc_jit_target_info,
+    ptr: NonNull<gccjit_sys::gcc_jit_target_info>,
 }
 
 unsafe impl Send for TargetInfo {}
@@ -30,14 +31,17 @@ impl TargetInfo {
         })
     }
 
-    pub fn arch(&self) -> Option<&'static CStr> {
-        with_lib_without_error_check(|lib| unsafe {
+    #[track_caller]
+    pub fn arch(&self) -> &CStr {
+        let arch = with_lib_without_error_check(|lib| unsafe {
             let arch = lib.gcc_jit_target_info_arch(get_ptr(self));
             if arch.is_null() {
-                return None;
+                None
+            } else {
+                Some(CStr::from_ptr(arch))
             }
-            Some(CStr::from_ptr(arch))
-        })
+        });
+        expect_handle_without_context(arch, "gcc_jit_target_info_arch")
     }
 
     pub fn supports_target_dependent_type(&self, c_type: CType) -> bool {
@@ -56,10 +60,12 @@ impl Drop for TargetInfo {
     }
 }
 
-pub unsafe fn from_ptr(ptr: *mut gccjit_sys::gcc_jit_target_info) -> TargetInfo {
-    TargetInfo { ptr }
+pub unsafe fn from_ptr(ptr: *mut gccjit_sys::gcc_jit_target_info) -> Option<TargetInfo> {
+    Some(TargetInfo {
+        ptr: NonNull::new(ptr)?,
+    })
 }
 
 pub unsafe fn get_ptr(target: &TargetInfo) -> *mut gccjit_sys::gcc_jit_target_info {
-    target.ptr
+    target.ptr.as_ptr()
 }

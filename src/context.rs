@@ -347,8 +347,9 @@ impl<'ctx> Context<'ctx> {
     }
 
     #[cfg(feature = "master")]
+    #[track_caller]
     pub fn get_target_info(&self) -> TargetInfo {
-        with_lib(self, |lib| unsafe {
+        with_lib_handle(self, |lib| unsafe {
             target_info::from_ptr(lib.gcc_jit_context_get_target_info(get_ptr(self)))
         })
     }
