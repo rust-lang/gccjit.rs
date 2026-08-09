@@ -187,10 +187,6 @@ impl<'ctx> Block<'ctx> {
                 region::get_ptr(&cleanup_region),
             );
         });
-        #[cfg(debug_assertions)]
-        if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-            panic!("{}", error);
-        }
     }
 
     /// Assigns the value of an rvalue to an lvalue directly. Equivalent
@@ -356,10 +352,6 @@ impl<'ctx> Block<'ctx> {
         with_lib(self, |lib| unsafe {
             lib.gcc_jit_block_end_with_fallthrough(get_ptr(self), loc_ptr);
         });
-        #[cfg(debug_assertions)]
-        if let Ok(Some(error)) = self.to_object().get_context().get_last_error() {
-            panic!("{}", error);
-        }
     }
 
     #[track_caller]
