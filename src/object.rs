@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::str;
 
-use crate::{context, with_lib, with_lib_without_error_check};
+use crate::{context, with_lib_without_error_check};
 
 /// Object represents the root of all objects in gccjit. It is not useful
 /// in and of itself, but it provides the implementation for Debug
@@ -18,7 +18,10 @@ pub struct Object<'ctx> {
 
 impl<'ctx> fmt::Debug for Object<'ctx> {
     fn fmt<'a>(&self, fmt: &mut fmt::Formatter<'a>) -> Result<(), fmt::Error> {
-        let rust_str = with_lib(self, |lib| unsafe {
+        // We do not do an error check here to prevent a double-panic:
+        // since a panic will call debug, having a panicking-check here would
+        // cause a double-panic.
+        let rust_str = with_lib_without_error_check(|lib| unsafe {
             let ptr = lib.gcc_jit_object_get_debug_string(get_ptr(self));
             let cstr = CStr::from_ptr(ptr);
             str::from_utf8_unchecked(cstr.to_bytes())
