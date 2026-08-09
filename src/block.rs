@@ -94,8 +94,9 @@ impl<'ctx> fmt::Debug for Block<'ctx> {
 }
 
 impl<'ctx> Block<'ctx> {
-    pub fn get_function(&self) -> Option<Function<'ctx>> {
-        with_lib(self, |lib| unsafe {
+    #[track_caller]
+    pub fn get_function(&self) -> Function<'ctx> {
+        with_lib_handle(self, |lib| unsafe {
             let ptr = lib.gcc_jit_block_get_function(get_ptr(self));
             function::from_ptr(ptr)
         })
