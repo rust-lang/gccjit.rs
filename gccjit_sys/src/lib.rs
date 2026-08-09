@@ -654,8 +654,12 @@ extern_maybe_dlopen! {
     fn gcc_jit_function_type_get_param_count(function_type: *mut gcc_jit_function_type) -> ssize_t;
     fn gcc_jit_type_dyncast_vector(typ: *mut gcc_jit_type) -> *mut gcc_jit_vector_type;
     fn gcc_jit_function_type_get_param_type(function_type: *mut gcc_jit_function_type, index: c_int) -> *mut gcc_jit_type;
+    #[cfg(feature="master")]
+    fn gcc_jit_function_type_as_object(function_type: *mut gcc_jit_function_type) -> *mut gcc_jit_object;
     fn gcc_jit_vector_type_get_num_units(vector_type: *mut gcc_jit_vector_type) -> ssize_t;
     fn gcc_jit_vector_type_get_element_type(vector_type: *mut gcc_jit_vector_type) -> *mut gcc_jit_type;
+    #[cfg(feature="master")]
+    fn gcc_jit_vector_type_as_object(vector_type: *mut gcc_jit_vector_type) -> *mut gcc_jit_object;
     fn gcc_jit_struct_get_field(struct_type: *mut gcc_jit_struct, index: c_int) -> *mut gcc_jit_field;
     fn gcc_jit_type_is_struct(typ: *mut gcc_jit_type) -> *mut gcc_jit_struct;
     fn gcc_jit_struct_get_field_count(struct_type: *mut gcc_jit_struct) -> ssize_t;
@@ -822,6 +826,8 @@ extern_maybe_dlopen! {
     #[cfg(feature="master")]
     fn gcc_jit_region_add_block(region: *mut gcc_jit_region,
                                 block: *mut gcc_jit_block);
+    #[cfg(feature="master")]
+    fn gcc_jit_region_as_object(region: *mut gcc_jit_region) -> *mut gcc_jit_object;
     #[cfg(feature="master")]
     fn gcc_jit_blocks_clone(num_blocks: c_int,
                             blocks: *mut *mut gcc_jit_block,
