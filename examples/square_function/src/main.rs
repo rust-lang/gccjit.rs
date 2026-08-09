@@ -25,14 +25,9 @@ fn main() {
     let parm = fun.get_param(0).to_rvalue();
     let square = parm * parm;
     block.end_with_return(None, square);
-    let result = context.compile();
-    let func = result.get_function("square");
-    let jit_compiled_fun : extern "C" fn(i32) -> i32 =
-        if !func.is_null() {
-            unsafe { mem::transmute(func) }
-        } else {
-            panic!("failed to retrieve function")
-        };
+    let result = context.compile().unwrap();
+    let func = result.get_function("square").unwrap();
+    let jit_compiled_fun : extern "C" fn(i32) -> i32 = unsafe { mem::transmute(func) };
     println!("the square of 2 is: {}", jit_compiled_fun(2));
     println!("the square of 10 is: {}", jit_compiled_fun(10));
     println!("the square of -2 is: {}", jit_compiled_fun(-2));

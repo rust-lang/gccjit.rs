@@ -5,7 +5,7 @@ use std::mem;
 
 use gccjit::ToRValue;
 
-const MEMORY_SIZE : i32 = 1000;
+const MEMORY_SIZE: u64 = 1000;
 
 #[derive(Copy, Clone)]
 pub enum Op {
@@ -31,15 +31,9 @@ fn main() {
         panic!("unbalanced brackets");
     }
 
-    let result = context.compile();
-    let main_result = result.get_function("bf_main");
-    let main : extern "C" fn() =
-        if !main_result.is_null() {
-            unsafe { mem::transmute(main_result) }
-        }
-        else {
-           panic!("failed to codegen")
-        };
+    let result = context.compile().unwrap();
+    let main_result = result.get_function("bf_main").unwrap();
+    let main: extern "C" fn() = unsafe { mem::transmute(main_result) };
     main();
 }
 
@@ -101,7 +95,7 @@ fn codegen<'a, 'ctx>(ops: &[Op], context: &'a gccjit::Context<'ctx>) -> bool {
 
     let brainf_main = context.new_function(None, gccjit::FunctionType::Exported, void_ty, &[], "bf_main", false);
     // next, we set up the brainfuck memory array.
-    let size = context.new_rvalue_from_int(int_ty, MEMORY_SIZE);
+    let size = context.new_rvalue_from_int(int_ty, MEMORY_SIZE as _);
     let array = brainf_main.new_local(None, memory_ty, "memory");
     let memory_ptr = brainf_main.new_local(None, int_ty, "memory_ptr");
     let mut current_block = brainf_main.new_block("entry_block");

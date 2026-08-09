@@ -38,15 +38,10 @@ fn main() {
     let call = context.new_call(None, factorial, &[n_minus_one]);
     let mul = parm * call;
     false_branch.end_with_return(None, mul);
-    let result = context.compile();
+    let result = context.compile().unwrap();
     factorial.dump_to_dot("factorial.dot");
-    let fact_ptr = result.get_function("factorial");
-    let fact_fn : extern "C" fn(i32) -> i32 =
-        if !fact_ptr.is_null() {
-            unsafe { mem::transmute(fact_ptr) }
-        } else {
-            panic!("failed to find factorial function")
-        };
+    let fact_ptr = result.get_function("factorial").unwrap();
+    let fact_fn : extern "C" fn(i32) -> i32 = unsafe { mem::transmute(fact_ptr) };
     println!("fact(5) = {}", fact_fn(5));
     println!("fact(10) = {}", fact_fn(10));
 }

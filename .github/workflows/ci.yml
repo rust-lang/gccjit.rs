@@ -77,17 +77,36 @@ jobs:
         if: ${{ matrix.os == 'windows-2025' }}
         run: cargo build --features master,dlopen
 
-      - name: Test
-        if: ${{ matrix.os == 'ubuntu-24.04' }}
-        run: |
-          cd examples/factorial
-          cargo build
-
       - name: clippy
         run: |
           cargo clippy --all-targets -- -D warnings
           cargo clippy --all-targets --features master,dlopen -- -D warnings
 
+          # The error checks are `#[cfg(debug_assertions)]`, so a release build
+          # exercises different code. Without these, `unused`/`dead_code`
+          # warnings that only appear in release go unnoticed.
+          cargo clippy --release --all-targets -- -D warnings
+          cargo clippy --release --all-targets --features master,dlopen -- -D warnings
+
           cd gccjit_sys
           cargo clippy --all-targets -- -D warnings
           cargo clippy --all-targets --features master,dlopen -- -D warnings
+          cargo clippy --release --all-targets -- -D warnings
+          cargo clippy --release --all-targets --features master,dlopen -- -D warnings
+
+      - name: Test
+        if: ${{ matrix.os == 'ubuntu-24.04' }}
+        run: |
+          cargo test
+          # Everything behind the `master` feature (the region API,
+          # `clone_blocks`, `Block::get_successors`, ...) is otherwise only
+          # compiled, never executed.
+          cargo test --features master
+          cd examples/factorial
+          cargo build
+          cd ../brainfuck
+          cargo build
+          cd ../hello_world
+          cargo build
+          cd ../square_function
+          cargo build

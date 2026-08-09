@@ -46,6 +46,7 @@ pub use block::{BinaryOp, Block, ComparisonOp, UnaryOp};
 pub use context::CType;
 pub use context::CompileResult;
 pub use context::Context;
+pub(crate) use context::ContextGetter;
 pub use context::GlobalKind;
 pub use context::OptimizationLevel;
 pub use context::OutputKind;
@@ -57,6 +58,7 @@ pub use location::Location;
 pub use lvalue::{LValue, TlsModel, ToLValue};
 #[cfg(feature = "master")]
 pub use lvalue::{VarAttribute, Visibility};
+pub(crate) use object::ContextRef;
 pub use object::Object;
 pub use object::ToObject;
 pub use parameter::Parameter;
@@ -77,7 +79,7 @@ use gccjit_sys::Libgccjit;
 #[cfg(feature = "master")]
 pub fn set_global_personality_function_name(name: &'static [u8]) {
     debug_assert!(name.ends_with(b"\0"), "Expecting a NUL-terminated C string");
-    with_lib(|lib| unsafe {
+    with_lib_without_error_check(|lib| unsafe {
         lib.gcc_jit_set_global_personality_function_name(name.as_ptr() as *const _);
     })
 }
@@ -91,7 +93,7 @@ pub struct Version {
 
 impl Version {
     pub fn get() -> Self {
-        with_lib(|lib| unsafe {
+        with_lib_without_error_check(|lib| unsafe {
             Self {
                 major: lib.gcc_jit_version_major(),
                 minor: lib.gcc_jit_version_minor(),
@@ -103,16 +105,90 @@ impl Version {
 
 #[cfg(feature = "master")]
 pub fn is_lto_supported() -> bool {
-    with_lib(|lib| unsafe { lib.gcc_jit_is_lto_supported() })
+    with_lib_without_error_check(|lib| unsafe { lib.gcc_jit_is_lto_supported() })
+}
+
+/// Runs a libgccjit call that returns a handle and is not expected to fail,
+/// panicking with libgccjit's own diagnostic when it does.
+#[track_caller]
+pub(crate) fn with_lib_handle<'ctx, C, T, F>(ctx: &C, callback: F) -> T
+where
+    C: context::ContextGetter<'ctx>,
+    F: FnOnce(&Libgccjit) -> Option<T>,
+{
+    match with_lib_without_error_check(callback) {
+        Some(handle) => {
+            #[cfg(debug_assertions)]
+            if let Ok(Some(error)) = ctx.context().get_last_error() {
+                panic!("{}", error);
+            }
+            handle
+        }
+        None => panic_on_null(ctx),
+    }
+}
+
+#[cold]
+#[track_caller]
+fn panic_on_null<'ctx, C: context::ContextGetter<'ctx>>(ctx: &C) -> ! {
+    match ctx.context().get_last_error() {
+        Ok(Some(error)) => panic!("gccjit: {}", error),
+        _ => panic!("gccjit: call returned NULL (libgccjit recorded no error; see stderr)"),
+    }
+}
+
+#[track_caller]
+pub(crate) fn expect_handle_without_context<T>(handle: Option<T>, operation: &str) -> T {
+    match handle {
+        Some(handle) => handle,
+        None => panic_without_context(operation),
+    }
+}
+
+#[cold]
+#[track_caller]
+fn panic_without_context(operation: &str) -> ! {
+    panic!(
+        "gccjit: {} returned NULL (no context available to query; see stderr)",
+        operation
+    )
 }
 
 #[cfg(not(feature = "dlopen"))]
-fn with_lib<T, F: Fn(&Libgccjit) -> T>(callback: F) -> T {
+#[cfg_attr(debug_assertions, track_caller)]
+fn with_lib<'ctx, C: context::ContextGetter<'ctx>, T, F: FnOnce(&Libgccjit) -> T>(
+    _ctx: &C,
+    callback: F,
+) -> T {
+    let ret = with_lib_without_error_check(callback);
+    #[cfg(debug_assertions)]
+    if let Ok(Some(error)) = _ctx.context().get_last_error() {
+        panic!("{}", error);
+    }
+    ret
+}
+
+#[cfg(not(feature = "dlopen"))]
+fn with_lib_without_error_check<T, F: FnOnce(&Libgccjit) -> T>(callback: F) -> T {
     callback(&LIB)
 }
 
 #[cfg(feature = "dlopen")]
-fn with_lib<T, F: Fn(&Libgccjit) -> T>(callback: F) -> T {
+#[cfg_attr(debug_assertions, track_caller)]
+fn with_lib<'ctx, C: context::ContextGetter<'ctx>, T, F: FnOnce(&Libgccjit) -> T>(
+    _ctx: &C,
+    callback: F,
+) -> T {
+    let ret = with_lib_without_error_check(callback);
+    #[cfg(debug_assertions)]
+    if let Ok(Some(error)) = _ctx.context().get_last_error() {
+        panic!("{}", error);
+    }
+    ret
+}
+
+#[cfg(feature = "dlopen")]
+fn with_lib_without_error_check<T, F: FnOnce(&Libgccjit) -> T>(callback: F) -> T {
     let lib = LIB.get().and_then(|lib| lib.as_ref());
     match lib {
         Some(lib) => callback(lib),
@@ -154,7 +230,7 @@ static LIB: Libgccjit = Libgccjit::new();
 #[cfg(feature = "master")]
 pub fn set_lang_name(lang_name: &'static CStr) {
     unsafe {
-        with_lib(|lib| {
+        with_lib_without_error_check(|lib| {
             lib.gcc_jit_set_lang_name(lang_name.as_ptr());
         });
     }
