@@ -12,9 +12,7 @@ use gccjit_sys::gcc_jit_types::*;
 
 #[cfg(feature = "master")]
 use crate::lvalue::AttributeValue;
-use crate::{
-    expect_handle_without_context, with_lib, with_lib_handle, with_lib_without_error_check,
-};
+use crate::{with_lib, with_lib_handle, with_lib_without_error_check};
 
 /// A representation of a type, as it is known to the JIT compiler.
 /// Types can be created through the Typeable trait or they can
@@ -31,6 +29,31 @@ pub struct VectorType<'ctx> {
     ptr: NonNull<gccjit_sys::gcc_jit_vector_type>,
 }
 
+#[cfg(feature = "master")]
+impl<'ctx> ToObject<'ctx> for VectorType<'ctx> {
+    fn to_object(&self) -> Object<'ctx> {
+        with_lib_without_error_check(|lib| unsafe {
+            let ptr = lib.gcc_jit_vector_type_as_object(self.get_ptr());
+            object::from_ptr(ptr).expect("Failed to get Object from VectorType")
+        })
+    }
+}
+
+#[cfg(feature = "master")]
+impl<'ctx> crate::ContextGetter<'ctx> for VectorType<'ctx> {
+    fn context(&self) -> crate::ContextRef<'ctx> {
+        self.to_object().context()
+    }
+}
+
+#[cfg(feature = "master")]
+impl<'ctx> fmt::Debug for VectorType<'ctx> {
+    fn fmt<'a>(&self, fmt: &mut fmt::Formatter<'a>) -> Result<(), fmt::Error> {
+        let obj = self.to_object();
+        obj.fmt(fmt)
+    }
+}
+
 impl<'ctx> VectorType<'ctx> {
     unsafe fn from_ptr(ptr: *mut gccjit_sys::gcc_jit_vector_type) -> Option<VectorType<'ctx>> {
         Some(VectorType {
@@ -41,21 +64,38 @@ impl<'ctx> VectorType<'ctx> {
 
     #[track_caller]
     pub fn get_element_type(&self) -> Type<'ctx> {
-        let typ = with_lib_without_error_check(|lib| unsafe {
+        let call = |lib: &crate::Libgccjit| unsafe {
             from_ptr(lib.gcc_jit_vector_type_get_element_type(self.get_ptr()))
-        });
-        let typ = expect_handle_without_context(typ, "gcc_jit_vector_type_get_element_type");
-        #[cfg(debug_assertions)]
-        if let Ok(Some(error)) = typ.to_object().get_context().get_last_error() {
-            panic!("{}", error);
+        };
+        #[cfg(not(feature = "master"))]
+        {
+            let typ = with_lib_without_error_check(call);
+            let typ =
+                crate::expect_handle_without_context(typ, "gcc_jit_vector_type_get_element_type");
+            #[cfg(debug_assertions)]
+            if let Ok(Some(error)) = typ.to_object().get_context().get_last_error() {
+                panic!("{}", error);
+            }
+            typ
         }
-        typ
+        #[cfg(feature = "master")]
+        {
+            with_lib_handle(self, call)
+        }
     }
 
     pub fn get_num_units(&self) -> usize {
-        with_lib_without_error_check(|lib| unsafe {
+        let call = |lib: &crate::Libgccjit| unsafe {
             lib.gcc_jit_vector_type_get_num_units(self.get_ptr()) as usize
-        })
+        };
+        #[cfg(not(feature = "master"))]
+        {
+            with_lib_without_error_check(call)
+        }
+        #[cfg(feature = "master")]
+        {
+            with_lib(self, call)
+        }
     }
 
     fn get_ptr(&self) -> *mut gccjit_sys::gcc_jit_vector_type {
@@ -67,6 +107,23 @@ impl<'ctx> VectorType<'ctx> {
 pub struct FunctionPtrType<'ctx> {
     marker: PhantomData<&'ctx Context<'ctx>>,
     ptr: NonNull<gccjit_sys::gcc_jit_function_type>,
+}
+
+#[cfg(feature = "master")]
+impl<'ctx> ToObject<'ctx> for FunctionPtrType<'ctx> {
+    fn to_object(&self) -> Object<'ctx> {
+        with_lib_without_error_check(|lib| unsafe {
+            let ptr = lib.gcc_jit_function_type_as_object(self.get_ptr());
+            object::from_ptr(ptr).expect("Failed to get Object from FunctionPtrType")
+        })
+    }
+}
+
+#[cfg(feature = "master")]
+impl<'ctx> crate::ContextGetter<'ctx> for FunctionPtrType<'ctx> {
+    fn context(&self) -> crate::ContextRef<'ctx> {
+        self.to_object().context()
+    }
 }
 
 impl<'ctx> fmt::Debug for FunctionPtrType<'ctx> {
@@ -91,34 +148,60 @@ impl<'ctx> FunctionPtrType<'ctx> {
 
     #[track_caller]
     pub fn get_return_type(&self) -> Type<'ctx> {
-        let typ = with_lib_without_error_check(|lib| unsafe {
+        let call = |lib: &crate::Libgccjit| unsafe {
             from_ptr(lib.gcc_jit_function_type_get_return_type(self.get_ptr()))
-        });
-        let typ = expect_handle_without_context(typ, "gcc_jit_function_type_get_return_type");
-        #[cfg(debug_assertions)]
-        if let Ok(Some(error)) = typ.to_object().get_context().get_last_error() {
-            panic!("{}", error);
+        };
+        #[cfg(not(feature = "master"))]
+        {
+            let typ = with_lib_without_error_check(call);
+            let typ =
+                crate::expect_handle_without_context(typ, "gcc_jit_function_type_get_return_type");
+            #[cfg(debug_assertions)]
+            if let Ok(Some(error)) = typ.to_object().get_context().get_last_error() {
+                panic!("{}", error);
+            }
+            typ
         }
-        typ
+        #[cfg(feature = "master")]
+        {
+            with_lib_handle(self, call)
+        }
     }
 
     pub fn get_param_count(&self) -> usize {
-        with_lib_without_error_check(|lib| unsafe {
+        let call = |lib: &crate::Libgccjit| unsafe {
             lib.gcc_jit_function_type_get_param_count(self.get_ptr()) as usize
-        })
+        };
+        #[cfg(not(feature = "master"))]
+        {
+            with_lib_without_error_check(call)
+        }
+        #[cfg(feature = "master")]
+        {
+            with_lib(self, call)
+        }
     }
 
     #[track_caller]
     pub fn get_param_type(&self, index: usize) -> Type<'ctx> {
-        let typ = with_lib_without_error_check(|lib| unsafe {
+        let call = |lib: &crate::Libgccjit| unsafe {
             from_ptr(lib.gcc_jit_function_type_get_param_type(self.get_ptr(), index as _))
-        });
-        let typ = expect_handle_without_context(typ, "gcc_jit_function_type_get_param_type");
-        #[cfg(debug_assertions)]
-        if let Ok(Some(error)) = typ.to_object().get_context().get_last_error() {
-            panic!("{}", error);
+        };
+        #[cfg(not(feature = "master"))]
+        {
+            let typ = with_lib_without_error_check(call);
+            let typ =
+                crate::expect_handle_without_context(typ, "gcc_jit_function_type_get_param_type");
+            #[cfg(debug_assertions)]
+            if let Ok(Some(error)) = typ.to_object().get_context().get_last_error() {
+                panic!("{}", error);
+            }
+            typ
         }
-        typ
+        #[cfg(feature = "master")]
+        {
+            with_lib_handle(self, call)
+        }
     }
 
     fn get_ptr(&self) -> *mut gccjit_sys::gcc_jit_function_type {
