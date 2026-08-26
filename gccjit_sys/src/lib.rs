@@ -308,6 +308,7 @@ pub enum gcc_jit_variable_attribute {
     GCC_JIT_VARIABLE_ATTRIBUTE_USED,
     GCC_JIT_VARIABLE_ATTRIBUTE_SECTION,
     GCC_JIT_VARIABLE_ATTRIBUTE_RETAIN,
+    GCC_JIT_VARIABLE_ATTRIBUTE_COMMON,
 }
 
 #[cfg(feature = "master")]

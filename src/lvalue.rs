@@ -48,6 +48,7 @@ pub enum AttributeValue<'a> {
 #[derive(Clone, Copy, Debug)]
 pub enum VarAttribute<'a> {
     Alias(&'a str),
+    Common,
     Retain,
     Section(&'a str),
     Used,
@@ -60,6 +61,7 @@ impl<'a> VarAttribute<'a> {
     fn get_value(&self) -> AttributeValue<'_> {
         match *self {
             Self::Alias(alias) => AttributeValue::String(alias),
+            Self::Common => AttributeValue::None,
             Self::Retain => AttributeValue::None,
             Self::Section(section) => AttributeValue::String(section),
             Self::Used => AttributeValue::None,
@@ -72,6 +74,9 @@ impl<'a> VarAttribute<'a> {
         match self {
             VarAttribute::Alias(_) => {
                 gccjit_sys::gcc_jit_variable_attribute::GCC_JIT_VARIABLE_ATTRIBUTE_ALIAS
+            }
+            VarAttribute::Common => {
+                gccjit_sys::gcc_jit_variable_attribute::GCC_JIT_VARIABLE_ATTRIBUTE_COMMON
             }
             VarAttribute::Retain => {
                 gccjit_sys::gcc_jit_variable_attribute::GCC_JIT_VARIABLE_ATTRIBUTE_RETAIN
