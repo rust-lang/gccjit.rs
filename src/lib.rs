@@ -128,7 +128,7 @@ where
 /// In libgccjit, get_last_error also returns warnings, so we try to not panic
 /// on warnings by checking the actual error count.
 #[track_caller]
-fn panic_on_error<'ctx, C: context::ContextGetter<'ctx>>(ctx: &C) {
+fn panic_on_error<'ctx, C: context::ContextGetter<'ctx>>(_ctx: &C) {
     #[cfg(debug_assertions)]
     {
         #[cfg(feature = "master")]
@@ -141,7 +141,7 @@ fn panic_on_error<'ctx, C: context::ContextGetter<'ctx>>(ctx: &C) {
             true
         }
 
-        let context = ctx.context();
+        let context = _ctx.context();
         if show_error(&context) {
             if let Ok(Some(error)) = context.get_last_error() {
                 panic!("{}", error);
