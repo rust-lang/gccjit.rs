@@ -1207,6 +1207,14 @@ impl<'ctx> Context<'ctx> {
     }
 
     #[cfg(feature = "master")]
+    #[track_caller]
+    pub fn get_error_count<'a>(&'a self) -> i32 {
+        with_lib_without_error_check(|lib| unsafe {
+            lib.gcc_jit_context_get_error_count(get_ptr(self))
+        })
+    }
+
+    #[cfg(feature = "master")]
     /// Creates a new RValue from a _Alignof(type).
     #[track_caller]
     pub fn new_alignof<'a>(&'a self, ty: types::Type<'a>) -> RValue<'a> {

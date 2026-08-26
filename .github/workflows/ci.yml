@@ -77,17 +77,16 @@ jobs:
         if: ${{ matrix.os == 'windows-2025' }}
         run: cargo build --features master,dlopen
 
-      - name: clippy
-        run: |
-          cargo clippy --all-targets -- -D warnings
-          cargo clippy --all-targets --features master,dlopen -- -D warnings
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo clippy --all-targets --features master,dlopen -- -D warnings
 
-          # The error checks are `#[cfg(debug_assertions)]`, so a release build
-          # exercises different code. Without these, `unused`/`dead_code`
-          # warnings that only appear in release go unnoticed.
-          cargo clippy --release --all-targets -- -D warnings
-          cargo clippy --release --all-targets --features master,dlopen -- -D warnings
+      # The error checks are `#[cfg(debug_assertions)]`, so a release build
+      # exercises different code. Without these, `unused`/`dead_code`
+      # warnings that only appear in release go unnoticed.
+      - run: cargo clippy --release --all-targets -- -D warnings
+      - run: cargo clippy --release --all-targets --features master,dlopen -- -D warnings
 
+      - run: |
           cd gccjit_sys
           cargo clippy --all-targets -- -D warnings
           cargo clippy --all-targets --features master,dlopen -- -D warnings

@@ -118,13 +118,35 @@ where
 {
     match with_lib_without_error_check(callback) {
         Some(handle) => {
-            #[cfg(debug_assertions)]
-            if let Ok(Some(error)) = ctx.context().get_last_error() {
-                panic!("{}", error);
-            }
+            panic_on_error(ctx);
             handle
         }
         None => panic_on_null(ctx),
+    }
+}
+
+/// In libgccjit, get_last_error also returns warnings, so we try to not panic
+/// on warnings by checking the actual error count.
+#[track_caller]
+fn panic_on_error<'ctx, C: context::ContextGetter<'ctx>>(_ctx: &C) {
+    #[cfg(debug_assertions)]
+    {
+        #[cfg(feature = "master")]
+        fn show_error<'ctx>(ctx: &Context<'ctx>) -> bool {
+            ctx.get_error_count() > 0
+        }
+
+        #[cfg(not(feature = "master"))]
+        fn show_error<'ctx>(_ctx: &Context<'ctx>) -> bool {
+            true
+        }
+
+        let context = _ctx.context();
+        if show_error(&context) {
+            if let Ok(Some(error)) = context.get_last_error() {
+                panic!("{}", error);
+            }
+        }
     }
 }
 
@@ -161,10 +183,7 @@ fn with_lib<'ctx, C: context::ContextGetter<'ctx>, T, F: FnOnce(&Libgccjit) -> T
     callback: F,
 ) -> T {
     let ret = with_lib_without_error_check(callback);
-    #[cfg(debug_assertions)]
-    if let Ok(Some(error)) = _ctx.context().get_last_error() {
-        panic!("{}", error);
-    }
+    panic_on_error(_ctx);
     ret
 }
 
@@ -180,10 +199,7 @@ fn with_lib<'ctx, C: context::ContextGetter<'ctx>, T, F: FnOnce(&Libgccjit) -> T
     callback: F,
 ) -> T {
     let ret = with_lib_without_error_check(callback);
-    #[cfg(debug_assertions)]
-    if let Ok(Some(error)) = _ctx.context().get_last_error() {
-        panic!("{}", error);
-    }
+    panic_on_error(_ctx);
     ret
 }
 

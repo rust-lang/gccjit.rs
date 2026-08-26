@@ -308,6 +308,7 @@ pub enum gcc_jit_variable_attribute {
     GCC_JIT_VARIABLE_ATTRIBUTE_USED,
     GCC_JIT_VARIABLE_ATTRIBUTE_SECTION,
     GCC_JIT_VARIABLE_ATTRIBUTE_RETAIN,
+    GCC_JIT_VARIABLE_ATTRIBUTE_COMMON,
 }
 
 #[cfg(feature = "master")]
@@ -837,4 +838,7 @@ extern_maybe_dlopen! {
     #[cfg(feature="master")]
     fn gcc_jit_block_get_successor(block: *mut gcc_jit_block,
                                    index: c_int) -> *mut gcc_jit_block;
+
+    #[cfg(feature="master")]
+    fn gcc_jit_context_get_error_count(ctx: *mut gcc_jit_context) -> c_int;
 }
