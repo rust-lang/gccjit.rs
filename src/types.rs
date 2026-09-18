@@ -240,13 +240,6 @@ impl<'ctx> Type<'ctx> {
         })
     }
 
-    #[cfg(feature = "master")]
-    pub fn set_addressable(&self) {
-        with_lib(self, |lib| unsafe {
-            lib.gcc_jit_type_set_addressable(get_ptr(self));
-        })
-    }
-
     /// Given a type T, creates a type of const T.
     #[track_caller]
     pub fn make_const(self) -> Type<'ctx> {
