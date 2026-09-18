@@ -838,4 +838,11 @@ extern_maybe_dlopen! {
 
     #[cfg(feature="master")]
     fn gcc_jit_context_get_error_count(ctx: *mut gcc_jit_context) -> c_int;
+
+    #[cfg(feature="master")]
+    fn gcc_jit_function_set_indirect_return(func: *mut gcc_jit_function);
+    #[cfg(feature="master")]
+    fn gcc_jit_function_type_set_indirect_return(function_type: *mut gcc_jit_function_type);
+    #[cfg(feature="master")]
+    fn gcc_jit_function_type_is_indirect_return(function_type: *mut gcc_jit_function_type) -> c_int;
 }
