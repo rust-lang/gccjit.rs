@@ -77,10 +77,9 @@ pub use types::Typeable;
 use gccjit_sys::Libgccjit;
 
 #[cfg(feature = "master")]
-pub fn set_global_personality_function_name(name: &'static [u8]) {
-    debug_assert!(name.ends_with(b"\0"), "Expecting a NUL-terminated C string");
+pub fn set_global_personality_function_name(name: &CStr) {
     with_lib_without_error_check(|lib| unsafe {
-        lib.gcc_jit_set_global_personality_function_name(name.as_ptr() as *const _);
+        lib.gcc_jit_set_global_personality_function_name(name.as_ptr());
     })
 }
 
