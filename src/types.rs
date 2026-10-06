@@ -204,6 +204,24 @@ impl<'ctx> FunctionPtrType<'ctx> {
         }
     }
 
+    /// Make functions of this type return their value in memory.
+    #[cfg(feature = "master")]
+    #[track_caller]
+    pub fn set_indirect_return(&self) {
+        with_lib(self, |lib| unsafe {
+            lib.gcc_jit_function_type_set_indirect_return(self.get_ptr());
+        })
+    }
+
+    /// Whether functions of this type return their value in memory.
+    #[cfg(feature = "master")]
+    #[track_caller]
+    pub fn is_indirect_return(&self) -> bool {
+        with_lib(self, |lib| unsafe {
+            lib.gcc_jit_function_type_is_indirect_return(self.get_ptr()) != 0
+        })
+    }
+
     fn get_ptr(&self) -> *mut gccjit_sys::gcc_jit_function_type {
         self.ptr.as_ptr()
     }

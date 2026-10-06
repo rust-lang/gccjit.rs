@@ -262,6 +262,15 @@ impl<'ctx> Function<'ctx> {
         })
     }
 
+    /// Make this function return its value in memory.
+    #[cfg(feature = "master")]
+    #[track_caller]
+    pub fn set_indirect_return(&self) {
+        with_lib(self, |lib| unsafe {
+            lib.gcc_jit_function_set_indirect_return(get_ptr(self));
+        })
+    }
+
     #[track_caller]
     pub fn get_address(&self, loc: Option<Location<'ctx>>) -> RValue<'ctx> {
         with_lib_handle(self, |lib| unsafe {
