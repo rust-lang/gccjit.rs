@@ -183,6 +183,19 @@ impl<'ctx> RValue<'ctx> {
             lib.gcc_jit_rvalue_set_bool_require_tail_call(get_ptr(self), require_tail_call as _);
         })
     }
+
+    /// Make this call, when it returns in memory, write its result directly to the destination it
+    /// is assigned to. The callee must not access that destination other than through its result.
+    #[cfg(feature = "master")]
+    #[track_caller]
+    pub fn set_return_slot_optimization(&self, return_slot_optimization: bool) {
+        with_lib(self, |lib| unsafe {
+            lib.gcc_jit_rvalue_set_bool_return_slot_optimization(
+                get_ptr(self),
+                return_slot_optimization as _,
+            );
+        })
+    }
 }
 
 pub unsafe fn from_ptr<'ctx>(ptr: *mut gccjit_sys::gcc_jit_rvalue) -> Option<RValue<'ctx>> {

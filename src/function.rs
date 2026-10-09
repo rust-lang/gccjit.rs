@@ -271,6 +271,16 @@ impl<'ctx> Function<'ctx> {
         })
     }
 
+    /// Make `local`, a local of this function with its return type, the storage of the
+    /// return value when it is returned in memory, so that returning `local` copies nothing.
+    #[cfg(feature = "master")]
+    #[track_caller]
+    pub fn set_named_return_value(&self, local: LValue<'ctx>) {
+        with_lib(self, |lib| unsafe {
+            lib.gcc_jit_function_set_named_return_value(get_ptr(self), lvalue::get_ptr(&local));
+        })
+    }
+
     #[track_caller]
     pub fn get_address(&self, loc: Option<Location<'ctx>>) -> RValue<'ctx> {
         with_lib_handle(self, |lib| unsafe {
