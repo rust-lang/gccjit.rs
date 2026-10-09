@@ -845,4 +845,8 @@ extern_maybe_dlopen! {
     fn gcc_jit_function_type_set_indirect_return(function_type: *mut gcc_jit_function_type);
     #[cfg(feature="master")]
     fn gcc_jit_function_type_is_indirect_return(function_type: *mut gcc_jit_function_type) -> c_int;
+    #[cfg(feature="master")]
+    fn gcc_jit_function_set_named_return_value(func: *mut gcc_jit_function, local: *mut gcc_jit_lvalue);
+    #[cfg(feature="master")]
+    fn gcc_jit_rvalue_set_bool_return_slot_optimization(call: *mut gcc_jit_rvalue, return_slot_optimization: c_int);
 }
