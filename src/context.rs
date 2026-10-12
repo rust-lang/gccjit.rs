@@ -993,6 +993,36 @@ impl<'ctx> Context<'ctx> {
         })
     }
 
+    /// Creates a constant array of type `array_type` initialized with `bytes`. The element type
+    /// of `array_type` must be a 1-byte integer type, and its number of elements must be
+    /// `bytes.len()`.
+    ///
+    /// The bytes can contain NULs and don't need to be NUL-terminated. Unlike an array
+    /// constructor of integer constants, the bytes are emitted as a string (`.ascii`/`.string`).
+    #[cfg(feature = "master")]
+    #[track_caller]
+    pub fn new_array_from_bytes<'a>(
+        &'a self,
+        loc: Option<Location<'a>>,
+        array_type: types::Type<'a>,
+        bytes: &[u8],
+    ) -> RValue<'a> {
+        with_lib_handle(self, |lib| unsafe {
+            let loc_ptr = match loc {
+                Some(loc) => location::get_ptr(&loc),
+                None => ptr::null_mut(),
+            };
+            let ptr = lib.gcc_jit_context_new_array_from_bytes(
+                get_ptr(self),
+                loc_ptr,
+                types::get_ptr(&array_type),
+                bytes.as_ptr() as *const _,
+                bytes.len() as _,
+            );
+            rvalue::from_ptr(ptr)
+        })
+    }
+
     #[cfg(feature = "master")]
     #[track_caller]
     pub fn new_rvalue_vector_perm<'a>(

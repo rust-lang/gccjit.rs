@@ -849,4 +849,10 @@ extern_maybe_dlopen! {
     fn gcc_jit_function_set_named_return_value(func: *mut gcc_jit_function, local: *mut gcc_jit_lvalue);
     #[cfg(feature="master")]
     fn gcc_jit_rvalue_set_bool_return_slot_optimization(call: *mut gcc_jit_rvalue, return_slot_optimization: c_int);
+    #[cfg(feature="master")]
+    fn gcc_jit_context_new_array_from_bytes(ctxt: *mut gcc_jit_context,
+                                            loc: *mut gcc_jit_location,
+                                            array_type: *mut gcc_jit_type,
+                                            bytes: *const c_void,
+                                            num_bytes: size_t) -> *mut gcc_jit_rvalue;
 }
