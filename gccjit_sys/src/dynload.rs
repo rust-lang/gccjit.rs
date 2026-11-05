@@ -65,7 +65,6 @@ mod platform {
         fn LoadLibraryW(lpLibFileName: *const u16) -> *mut c_void;
         fn GetProcAddress(hModule: *mut c_void, lpProcName: *const c_char) -> *mut c_void;
         fn FreeLibrary(hLibModule: *mut c_void);
-        fn GetLastError() -> u32;
     }
 
     pub struct Library(*mut c_void);
@@ -80,7 +79,10 @@ mod platform {
             let w: Vec<u16> = path.encode_wide().chain([0]).collect();
             let handle = LoadLibraryW(w.as_ptr());
             if handle.is_null() {
-                Err(format!("cannot load library: {}", GetLastError()))
+                Err(format!(
+                    "cannot load library: {}",
+                    std::io::Error::last_os_error()
+                ))
             } else {
                 Ok(Self(handle))
             }
