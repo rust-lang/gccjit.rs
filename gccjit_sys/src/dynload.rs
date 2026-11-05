@@ -76,10 +76,13 @@ mod platform {
         pub unsafe fn open(path: &CStr) -> Result<Self, String> {
             let path = path.to_str().unwrap();
             let path = OsString::from(path);
-            let w: Vec<u16> = path.encode_wide().collect();
+            let w: Vec<u16> = path.encode_wide().chain([0]).collect();
             let handle = LoadLibraryW(w.as_ptr());
             if handle.is_null() {
-                Err("cannot load library".to_string())
+                Err(format!(
+                    "cannot load library: {}",
+                    std::io::Error::last_os_error()
+                ))
             } else {
                 Ok(Self(handle))
             }
