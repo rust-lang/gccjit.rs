@@ -65,6 +65,7 @@ mod platform {
         fn LoadLibraryW(lpLibFileName: *const u16) -> *mut c_void;
         fn GetProcAddress(hModule: *mut c_void, lpProcName: *const c_char) -> *mut c_void;
         fn FreeLibrary(hLibModule: *mut c_void);
+        fn GetLastError() -> u32;
     }
 
     pub struct Library(*mut c_void);
@@ -76,10 +77,10 @@ mod platform {
         pub unsafe fn open(path: &CStr) -> Result<Self, String> {
             let path = path.to_str().unwrap();
             let path = OsString::from(path);
-            let w: Vec<u16> = path.encode_wide().collect();
+            let w: Vec<u16> = path.encode_wide().chain([0]).collect();
             let handle = LoadLibraryW(w.as_ptr());
             if handle.is_null() {
-                Err("cannot load library".to_string())
+                Err(format!("cannot load library: {}", GetLastError()))
             } else {
                 Ok(Self(handle))
             }
