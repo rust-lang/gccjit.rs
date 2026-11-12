@@ -3,7 +3,8 @@ name: Publish to crates.io
 on:
   push:
     tags:
-      - "*"
+      # Matches the tag pattern allowed by the `publish` environment.
+      - "v*"
 
 jobs:
   publish:
@@ -18,9 +19,38 @@ jobs:
       - uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
         id: auth
       - name: Publish to crates.io
+        # A release can bump only one of the two crates, so a crate whose version
+        # is already on crates.io is skipped. Any other error fails the job.
         run: |
-          cargo publish
-          cd gccjit_sys
-          cargo publish
+          # pipefail: without it, `cargo publish ... | tee` would report tee's exit code.
+          set -euo pipefail
+
+          publish() {
+            local log msg
+            # Write logs outside the checkout. Otherwise, an untracked file would make
+            # `cargo publish` fail as dirty.
+            log=$(mktemp)
+
+            # Show cargo's output live and keep a copy in `$log` for the check below.
+            # Running the command as an `if` condition stops `set -e` from exiting on
+            # a failure, so we can look at why it failed.
+            if cargo publish --features master "$@" 2>&1 | tee "$log"; then
+              # The crate was published.
+              return 0
+            fi
+            # `cargo publish` failed.
+
+            if msg=$(grep -o 'crate [^ ]* already exists on crates.io index' "$log"); then
+              echo "::notice::$msg, skipping"
+              return 0
+            fi
+
+            # Any other error (network, auth, build...) fails the job.
+            return 1
+          }
+
+          # `gccjit` depends on `gccjit_sys`, so `gccjit_sys` must be published first.
+          publish --manifest-path gccjit_sys/Cargo.toml
+          publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
