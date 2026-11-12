@@ -34,7 +34,7 @@ jobs:
             # Show cargo's output live and keep a copy in `$log` for the check below.
             # Running the command as an `if` condition stops `set -e` from exiting on
             # a failure, so we can look at why it failed.
-            if cargo publish "$@" 2>&1 | tee "$log"; then
+            if cargo publish --features master "$@" 2>&1 | tee "$log"; then
               # The crate was published.
               return 0
             fi
